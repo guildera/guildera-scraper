@@ -1,0 +1,140 @@
+name: Guildera Scraper
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      source_type:
+        description: 'Source type (user/hashtag/keyword/url)'
+        required: false
+        default: ''
+        type: string
+      target:
+        description: 'Search target'
+        required: false
+        default: ''
+        type: string
+      max_results:
+        description: 'Max results'
+        required: false
+        default: ''
+        type: string
+      media_only:
+        description: 'Media only (true/false)'
+        required: false
+        default: ''
+        type: string
+      start_date:
+        description: 'Start date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      end_date:
+        description: 'End date (YYYY-MM-DD)'
+        required: false
+        default: ''
+        type: string
+      filter_replies:
+        description: 'Filter replies (all/posts/replies)'
+        required: false
+        default: 'all'
+        type: string
+  repository_dispatch:
+    types: [trigger-scrape]
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cache node_modules
+        id: cache-npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Build config JSON
+        id: config
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "Using repository_dispatch client_payload"
+            SOURCE_TYPE=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_type','user'))" 2>/dev/null || echo "user")
+            TARGET=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('target',''))" 2>/dev/null || echo "")
+            MAX_RESULTS=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('max_results','10'))" 2>/dev/null || echo "10")
+            MEDIA_ONLY=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('media_only','false'))" 2>/dev/null || echo "false")
+            START_DATE=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('start_date',''))" 2>/dev/null || echo "")
+            END_DATE=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('end_date',''))" 2>/dev/null || echo "")
+            FILTER_REPLIES=$(echo '${{ github.event.client_payload }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('filter_replies','all'))" 2>/dev/null || echo "all")
+          elif [ -n "${{ github.event.inputs.source_type }}" ]; then
+            echo "Using workflow_dispatch inputs"
+            SOURCE_TYPE="${{ github.event.inputs.source_type }}"
+            TARGET="${{ github.event.inputs.target }}"
+            MAX_RESULTS="${{ github.event.inputs.max_results }}"
+            MEDIA_ONLY="${{ github.event.inputs.media_only }}"
+            START_DATE="${{ github.event.inputs.start_date }}"
+            END_DATE="${{ github.event.inputs.end_date }}"
+            FILTER_REPLIES="${{ github.event.inputs.filter_replies }}"
+          else
+            echo "Using CONFIG_JSON secret fallback"
+            SOURCE_TYPE=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('source_type','user'))" 2>/dev/null || echo "user")
+            TARGET=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('target',''))" 2>/dev/null || echo "")
+            MAX_RESULTS=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('max_results','10'))" 2>/dev/null || echo "10")
+            MEDIA_ONLY=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('media_only','false'))" 2>/dev/null || echo "false")
+            START_DATE=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('start_date',''))" 2>/dev/null || echo "")
+            END_DATE=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('end_date',''))" 2>/dev/null || echo "")
+            FILTER_REPLIES=$(echo '${{ secrets.CONFIG_JSON }}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('filter_replies','all'))" 2>/dev/null || echo "all")
+          fi
+          if [ "$MEDIA_ONLY" = "true" ]; then MEDIA_BOOL="true"; else MEDIA_BOOL="false"; fi
+          KH="${{ secrets.KEY_HASH }}"
+          CONFIG="{\"source_type\":\"${SOURCE_TYPE}\",\"target\":\"${TARGET}\",\"max_results\":\"${MAX_RESULTS}\",\"media_only\":${MEDIA_BOOL},\"key_hash\":\"${KH}\",\"start_date\":\"${START_DATE}\",\"end_date\":\"${END_DATE}\",\"filter_replies\":\"${FILTER_REPLIES}\"}"
+          echo "Config: $CONFIG"
+          echo "config=$CONFIG" >> $GITHUB_OUTPUT
+          echo "source_type=$SOURCE_TYPE" >> $GITHUB_OUTPUT
+          echo "target=$TARGET" >> $GITHUB_OUTPUT
+          echo "max_results=$MAX_RESULTS" >> $GITHUB_OUTPUT
+          echo "media_only=$MEDIA_ONLY" >> $GITHUB_OUTPUT
+          echo "start_date=$START_DATE" >> $GITHUB_OUTPUT
+          echo "end_date=$END_DATE" >> $GITHUB_OUTPUT
+          echo "filter_replies=$FILTER_REPLIES" >> $GITHUB_OUTPUT
+
+      - name: Run scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          X_STATE: ${{ secrets.X_STATE }}
+          CONFIG_JSON: ${{ steps.config.outputs.config }}
+          KEY_HASH: ${{ secrets.KEY_HASH }}
+          SOURCE_TYPE: ${{ steps.config.outputs.source_type }}
+          TARGET: ${{ steps.config.outputs.target }}
+          MAX_RESULTS: ${{ steps.config.outputs.max_results }}
+          MEDIA_ONLY: ${{ steps.config.outputs.media_only }}
+          START_DATE: ${{ steps.config.outputs.start_date }}
+          END_DATE: ${{ steps.config.outputs.end_date }}
+          FILTER_REPLIES: ${{ steps.config.outputs.filter_replies }}
+        run: node scraper.js

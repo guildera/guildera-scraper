@@ -1,0 +1,1 @@
+{ "name": "guildera-scraper", "version": "1.0.0", "private": true, "description": "Guildera X Scraper", "main": "scraper.js", "scripts": { "scrape": "node scraper.js" }, "dependencies": { "playwright": "1.45.0", "@supabase/supabase-js": "^2.45.0", "ws": "^8.18.0" } }

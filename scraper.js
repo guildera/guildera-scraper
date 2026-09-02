@@ -323,26 +323,37 @@ function extractDateFromText(text) {
               quoteCount = parseEngagementNum(label || '');
             }
           } catch(e2) {}
-        }
+}
 
-        // ─── VIEWS EXTRACTION (ADDED FIX) ───
-        let viewCount = 0;
-        try {
-          // X shows views in a footer/anchor element like "10.2K Views"
-          const viewAnchor = tweet.locator('a[href*="/analytics"]').last();
-          if (await viewAnchor.count({ timeout: 1500 })) {
-            const vText = await viewAnchor.innerText({ timeout: 1500 });
-            const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
-            if (m) viewCount = parseEngagementNum(m[1]);
-          }
-        } catch(e) {}
-        // Fallback: search whole tweet text for "Views"
-        if (!viewCount) {
-          try {
-            const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
-            if (m) viewCount = parseEngagementNum(m[1]);
-          } catch(e) {}
-        }
+// ─── VIEWS EXTRACTION (ADDED FIX) ───
+let viewCount = 0;
+// Strategy 1: analytics anchor ("... /analytics") which holds "10.2K Views"
+try {
+  const viewAnchor = tweet.locator('a[href*="/analytics"]').first();
+  if (await viewAnchor.count({ timeout: 1000 })) {
+    const vText = await viewAnchor.innerText({ timeout: 1000 });
+    const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
+    if (m) viewCount = parseEngagementNum(m[1]);
+  }
+} catch(e) {}
+// Strategy 2: any element whose text is exactly "<number> Views" anywhere in tweet
+if (!viewCount) {
+  try {
+    const viewEl = tweet.locator('span:has-text("Views"), div:has-text("Views"), a:has-text("Views")').last();
+    if (await viewEl.count({ timeout: 1000 })) {
+      const vText = await viewEl.innerText({ timeout: 1000 });
+      const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
+      if (m) viewCount = parseEngagementNum(m[1]);
+    }
+  } catch(e) {}
+}
+// Strategy 3: fallback regex over the full tweet innerText
+if (!viewCount) {
+  try {
+    const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
+    if (m) viewCount = parseEngagementNum(m[1]);
+  } catch(e) {}
+}
 
         posts.push({
           tweet_id: tweetId || `unknown-${Date.now()}-${i}`,

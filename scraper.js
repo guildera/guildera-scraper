@@ -325,6 +325,25 @@ function extractDateFromText(text) {
           } catch(e2) {}
         }
 
+        // ─── VIEWS EXTRACTION (ADDED FIX) ───
+        let viewCount = 0;
+        try {
+          // X shows views in a footer/anchor element like "10.2K Views"
+          const viewAnchor = tweet.locator('a[href*="/analytics"]').last();
+          if (await viewAnchor.count({ timeout: 1500 })) {
+            const vText = await viewAnchor.innerText({ timeout: 1500 });
+            const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
+            if (m) viewCount = parseEngagementNum(m[1]);
+          }
+        } catch(e) {}
+        // Fallback: search whole tweet text for "Views"
+        if (!viewCount) {
+          try {
+            const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
+            if (m) viewCount = parseEngagementNum(m[1]);
+          } catch(e) {}
+        }
+
         posts.push({
           tweet_id: tweetId || `unknown-${Date.now()}-${i}`,
           author: tweetAuthor,
@@ -336,6 +355,7 @@ function extractDateFromText(text) {
           like_count: likeCount,
           reply_count: replyCount,
           quote_count: quoteCount,
+          view_count: viewCount,
           has_media: hasMedia,
           media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
           author_avatar: authorAvatar,
@@ -356,7 +376,7 @@ function extractDateFromText(text) {
     if (newPosts === 0) {
       consecutiveEmptyScrolls++;
       if (consecutiveEmptyScrolls >= 3) {
-        console.log('3 consecutive empty scrolls â€” no more posts available');
+        console.log('3 consecutive empty scrolls — no more posts available');
         break;
       }
     } else {

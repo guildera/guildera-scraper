@@ -431,6 +431,7 @@ function extractDateFromText(text) {
       is_reply: false,
       is_retweet: false,
       is_quote: false,
+      is_verified: p.is_verified || false,
       language: '',
       source: 'x',
     };

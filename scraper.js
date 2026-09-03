@@ -322,6 +322,7 @@ function extractDateFromText(text) {
 
         // ─── VIEWS EXTRACTION (robust) ───
         let viewCount = 0;
+        // Strategy 1: analytics link (individual post view)
         try {
           const viewAnchor = tweet.locator('a[href*="/analytics"]').first();
           if (await viewAnchor.count({ timeout: 1000 })) {
@@ -330,6 +331,18 @@ function extractDateFromText(text) {
             if (m) viewCount = parseEngagementNum(m[1]);
           }
         } catch(e) {}
+        // Strategy 2: aria-label containing "view"
+        if (!viewCount) {
+          try {
+            const viewAria = tweet.locator('[aria-label*="view" i], [aria-label*="View" i]').first();
+            if (await viewAria.count({ timeout: 1000 })) {
+              const label = await viewAria.getAttribute('aria-label', { timeout: 1000 });
+              const m = (label || '').match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
+              if (m) viewCount = parseEngagementNum(m[1]);
+            }
+          } catch(e) {}
+        }
+        // Strategy 3: text containing "Views"
         if (!viewCount) {
           try {
             const viewEl = tweet.locator('span:has-text("Views"), div:has-text("Views"), a:has-text("Views")').last();
@@ -340,6 +353,21 @@ function extractDateFromText(text) {
             }
           } catch(e) {}
         }
+        // Strategy 4: look for "views" near engagement metrics (search timeline layout)
+        if (!viewCount) {
+          try {
+            const allSpans = tweet.locator('span');
+            const count = await allSpans.count({ timeout: 1000 });
+            for (let v = 0; v < Math.min(count, 30); v++) {
+              const t = await allSpans.nth(v).textContent({ timeout: 500 });
+              if (t && /[\d.,]+[KkMm]?\s*[Vv]iew/i.test(t)) {
+                const m = t.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
+                if (m) { viewCount = parseEngagementNum(m[1]); break; }
+              }
+            }
+          } catch(e) {}
+        }
+        // Strategy 5: regex on post text
         if (!viewCount) {
           try {
             const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
@@ -365,7 +393,7 @@ function extractDateFromText(text) {
           is_verified: isVerified,
           api_key_hash: keyHash,
         });
-        if (i === 0 || viewCount > 0) console.log(`  Post ${i}: views=${viewCount} likes=${likeCount} rt=${retweetCount}`);
+        if (i === 0 || viewCount > 0) console.log(`  Post ${i}: views=${viewCount} likes=${likeCount} rt=${retweetCount} replies=${replyCount}`);
         newCount++;
       } catch (err) {
         console.log(`  Extract error: ${err.message}`);

@@ -83,6 +83,7 @@ jobs:
           MEDIA_ONLY: ${{ github.event.inputs.media_only || 'false' }}
           RAW_QUERY: ${{ github.event.inputs.raw_query || '' }}
           KEY_HASH: ${{ secrets.KEY_HASH }}
+          SEARCH_QUERY: ${{ github.event.inputs.target || '' }}
           MIN_LIKES: ${{ github.event.inputs.min_likes || '0' }}
           MIN_RETWEETS: ${{ github.event.inputs.min_retweets || '0' }}
           MIN_REPLIES: ${{ github.event.inputs.min_replies || '0' }}

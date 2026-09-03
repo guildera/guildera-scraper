@@ -464,6 +464,7 @@ function extractDateFromText(text) {
       is_verified: p.is_verified || false,
       language: '',
       source: 'x',
+      search_query: process.env.SEARCH_QUERY || '',
     };
   });
 

@@ -414,6 +414,7 @@ function extractDateFromText(text) {
       author_id: '',
       author_username: p.username ? p.username.replace('@', '') : (p.author || ''),
       author_name: p.author || '',
+      author_avatar: p.author_avatar || '',
       text: p.text || '',
       created_at: p.created_at || '',
       like_count: p.like_count || 0,

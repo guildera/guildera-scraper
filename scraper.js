@@ -1,12 +1,9 @@
 const { chromium } = require('playwright');
-const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
-let ws;
-try { ws = require('ws'); } catch(e) {}
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
+const wordpressUrl = process.env.WORDPRESS_URL || 'https://guildera.ai';
+const uploadKey = process.env.WORDPRESS_UPLOAD_KEY || '';
 const configJson = process.env.CONFIG_JSON || '{}';
 const config = JSON.parse(configJson);
 
@@ -32,8 +29,8 @@ const minRetweets = parseInt(process.env.MIN_RETWEETS || config.min_retweets || 
 const minReplies = parseInt(process.env.MIN_REPLIES || config.min_replies || '0', 10) || 0;
 const minViews = parseInt(process.env.MIN_VIEWS || config.min_views || '0', 10) || 0;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+if (!wordpressUrl || !uploadKey) {
+  console.error('Missing WORDPRESS_URL or WORDPRESS_UPLOAD_KEY');
   process.exit(1);
 }
 
@@ -41,10 +38,6 @@ if (!target && !rawQuery) {
   console.error('Missing target or raw_query in env or CONFIG_JSON');
   process.exit(1);
 }
-
-const supabaseOptions = {};
-if (ws) supabaseOptions.realtime = { transport: ws };
-const supabase = createClient(supabaseUrl, supabaseKey, supabaseOptions);
 
 function parseEngagementNum(str) {
   if (!str) return 0;
@@ -323,37 +316,34 @@ function extractDateFromText(text) {
               quoteCount = parseEngagementNum(label || '');
             }
           } catch(e2) {}
-}
+        }
 
-// ─── VIEWS EXTRACTION (ADDED FIX) ───
-let viewCount = 0;
-// Strategy 1: analytics anchor ("... /analytics") which holds "10.2K Views"
-try {
-  const viewAnchor = tweet.locator('a[href*="/analytics"]').first();
-  if (await viewAnchor.count({ timeout: 1000 })) {
-    const vText = await viewAnchor.innerText({ timeout: 1000 });
-    const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
-    if (m) viewCount = parseEngagementNum(m[1]);
-  }
-} catch(e) {}
-// Strategy 2: any element whose text is exactly "<number> Views" anywhere in tweet
-if (!viewCount) {
-  try {
-    const viewEl = tweet.locator('span:has-text("Views"), div:has-text("Views"), a:has-text("Views")').last();
-    if (await viewEl.count({ timeout: 1000 })) {
-      const vText = await viewEl.innerText({ timeout: 1000 });
-      const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
-      if (m) viewCount = parseEngagementNum(m[1]);
-    }
-  } catch(e) {}
-}
-// Strategy 3: fallback regex over the full tweet innerText
-if (!viewCount) {
-  try {
-    const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
-    if (m) viewCount = parseEngagementNum(m[1]);
-  } catch(e) {}
-}
+        // ─── VIEWS EXTRACTION (robust) ───
+        let viewCount = 0;
+        try {
+          const viewAnchor = tweet.locator('a[href*="/analytics"]').first();
+          if (await viewAnchor.count({ timeout: 1000 })) {
+            const vText = await viewAnchor.innerText({ timeout: 1000 });
+            const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
+            if (m) viewCount = parseEngagementNum(m[1]);
+          }
+        } catch(e) {}
+        if (!viewCount) {
+          try {
+            const viewEl = tweet.locator('span:has-text("Views"), div:has-text("Views"), a:has-text("Views")').last();
+            if (await viewEl.count({ timeout: 1000 })) {
+              const vText = await viewEl.innerText({ timeout: 1000 });
+              const m = (vText || '').match(/([\d.,]+[KkMm]?)\s*Views/i);
+              if (m) viewCount = parseEngagementNum(m[1]);
+            }
+          } catch(e) {}
+        }
+        if (!viewCount) {
+          try {
+            const m = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
+            if (m) viewCount = parseEngagementNum(m[1]);
+          } catch(e) {}
+        }
 
         posts.push({
           tweet_id: tweetId || `unknown-${Date.now()}-${i}`,
@@ -373,6 +363,7 @@ if (!viewCount) {
           is_verified: isVerified,
           api_key_hash: keyHash,
         });
+        if (i === 0 || viewCount > 0) console.log(`  Post ${i}: views=${viewCount} likes=${likeCount} rt=${retweetCount}`);
         newCount++;
       } catch (err) {
         console.log(`  Extract error: ${err.message}`);
@@ -411,18 +402,56 @@ if (!viewCount) {
   if (minViews > 0) unique = unique.filter(p => (p.view_count || 0) >= minViews);
   if (unique.length < beforeFilter) console.log(`View filter: ${beforeFilter} -> ${unique.length} posts (min_views=${minViews})`);
 
-  console.log(`Saving ${unique.length} posts to Supabase...`);
+  console.log(`Saving ${unique.length} posts to WordPress (${wordpressUrl})...`);
 
-  if (unique.length > 0) {
-    const { data, error } = await supabase
-      .from('scraped_posts')
-      .insert(unique);
+  // Convert each post to the WP save_posts format
+  const toSave = unique.map(p => {
+    let mediaUrlsArr = [];
+    try { mediaUrlsArr = p.media_urls ? JSON.parse(p.media_urls) : []; } catch(e) {}
+    return {
+      api_key_hash: keyHash,
+      post_id: String(p.tweet_id).startsWith('unknown-') ? '' : String(p.tweet_id),
+      author_id: '',
+      author_username: p.username ? p.username.replace('@', '') : (p.author || ''),
+      author_name: p.author || '',
+      text: p.text || '',
+      created_at: p.created_at || '',
+      like_count: p.like_count || 0,
+      retweet_count: p.retweet_count || 0,
+      reply_count: p.reply_count || 0,
+      quote_count: p.quote_count || 0,
+      view_count: p.view_count || 0,
+      bookmark_count: 0,
+      impression_count: 0,
+      media_urls: mediaUrlsArr,
+      urls: [],
+      hashtags: [],
+      mentions: [],
+      is_reply: false,
+      is_retweet: false,
+      is_quote: false,
+      language: '',
+      source: 'x',
+    };
+  });
 
-    if (error) {
-      console.log('SUPABASE ERROR:', error.message);
-      console.log('Error details:', JSON.stringify(error));
-    } else {
-      console.log(`SUCCESS! ${unique.length} posts saved.`);
+  if (toSave.length > 0) {
+    try {
+      const resp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Key': uploadKey,
+        },
+        body: JSON.stringify({
+          action: 'guildera_scraper_save_posts',
+          posts: toSave,
+        }),
+      });
+      const text = await resp.text();
+      console.log(`WordPress save_posts response (${resp.status}): ${text.substring(0, 500)}`);
+    } catch (err) {
+      console.log(`WordPress save_posts error: ${err.message}`);
     }
   } else {
     console.log('No posts to save.');

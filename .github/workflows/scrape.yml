@@ -75,8 +75,8 @@ jobs:
       - name: Run scraper
         run: node scraper.js
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          WORDPRESS_URL: ${{ secrets.WORDPRESS_URL }}
+          WORDPRESS_UPLOAD_KEY: ${{ secrets.WORDPRESS_UPLOAD_KEY }}
           SOURCE_TYPE: ${{ github.event.inputs.source_type || '' }}
           TARGET: ${{ github.event.inputs.target || '' }}
           MAX_RESULTS: ${{ github.event.inputs.max_results || '10' }}

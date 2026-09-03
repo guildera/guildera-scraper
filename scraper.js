@@ -437,14 +437,13 @@ function extractDateFromText(text) {
 
   if (toSave.length > 0) {
     try {
-      const resp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php`, {
+      const resp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_save_posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Auth-Key': uploadKey,
         },
         body: JSON.stringify({
-          action: 'guildera_scraper_save_posts',
           posts: toSave,
         }),
       });

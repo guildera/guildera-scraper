@@ -275,49 +275,54 @@ function extractDateFromText(text) {
         if (tweetId) collectedIds.add(tweetId);
 
         let retweetCount = 0, likeCount = 0, replyCount = 0, quoteCount = 0;
-        // Primary: use data-testid selectors (more reliable than group text parsing)
-        const testids = ['reply', 'retweet', 'like', 'unlike'];
-        for (const tid of testids) {
+        // Primary: parse [role="group"] text (most reliable for search results)
+        try {
+          const groupEl = tweet.locator('[role="group"]').first();
+          const hasGroup = await groupEl.count({ timeout: 2000 });
+          if (hasGroup) {
+            const groupText = await groupEl.innerText({ timeout: 2000 });
+            const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
+            // X search results order: Like, Retweet, Reply, Quote
+            if (nums.length >= 4) {
+              likeCount = parseEngagementNum(nums[0]);
+              retweetCount = parseEngagementNum(nums[1]);
+              replyCount = parseEngagementNum(nums[2]);
+              quoteCount = parseEngagementNum(nums[3]);
+            } else if (nums.length === 3) {
+              likeCount = parseEngagementNum(nums[0]);
+              replyCount = parseEngagementNum(nums[1]);
+              retweetCount = parseEngagementNum(nums[2]);
+            } else if (nums.length === 2) {
+              likeCount = parseEngagementNum(nums[0]);
+              replyCount = parseEngagementNum(nums[1]);
+            }
+          }
+        } catch(e) {}
+        // Fallback: data-testid selectors (for individual post pages)
+        if (retweetCount === 0 && likeCount === 0 && replyCount === 0) {
+          const testids = ['reply', 'retweet', 'like', 'unlike'];
+          for (const tid of testids) {
+            try {
+              const el = tweet.locator(`[data-testid="${tid}"]`).first();
+              const cnt = await el.count({ timeout: 500 });
+              if (cnt) {
+                const label = await el.getAttribute('aria-label', { timeout: 500 });
+                const textContent = await el.textContent({ timeout: 500 });
+                const val = parseEngagementNum(label || textContent || '');
+                if (tid === 'reply') replyCount = val;
+                else if (tid === 'retweet') retweetCount = val;
+                else if (tid === 'like' || tid === 'unlike') likeCount = val;
+              }
+            } catch(e2) {}
+          }
           try {
-            const el = tweet.locator(`[data-testid="${tid}"]`).first();
-            const cnt = await el.count({ timeout: 500 });
+            const quoteEl = tweet.locator('[data-testid="quote"]').first();
+            const cnt = await quoteEl.count({ timeout: 500 });
             if (cnt) {
-              const label = await el.getAttribute('aria-label', { timeout: 500 });
-              const textContent = await el.textContent({ timeout: 500 });
-              const val = parseEngagementNum(label || textContent || '');
-              if (tid === 'reply') replyCount = val;
-              else if (tid === 'retweet') retweetCount = val;
-              else if (tid === 'like' || tid === 'unlike') likeCount = val;
+              const label = await quoteEl.getAttribute('aria-label', { timeout: 500 });
+              quoteCount = parseEngagementNum(label || '');
             }
           } catch(e2) {}
-        }
-        try {
-          const quoteEl = tweet.locator('[data-testid="quote"]').first();
-          const cnt = await quoteEl.count({ timeout: 500 });
-          if (cnt) {
-            const label = await quoteEl.getAttribute('aria-label', { timeout: 500 });
-            quoteCount = parseEngagementNum(label || '');
-          }
-        } catch(e2) {}
-        // Fallback: parse [role="group"] text if data-testid didn't work
-        if (retweetCount === 0 && likeCount === 0 && replyCount === 0) {
-          try {
-            const groupEl = tweet.locator('[role="group"]').first();
-            const hasGroup = await groupEl.count({ timeout: 2000 });
-            if (hasGroup) {
-              const groupText = await groupEl.innerText({ timeout: 2000 });
-              const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
-              if (nums.length >= 4) {
-                likeCount = parseEngagementNum(nums[0]);
-                retweetCount = parseEngagementNum(nums[1]);
-                replyCount = parseEngagementNum(nums[2]);
-                quoteCount = parseEngagementNum(nums[3]);
-              } else if (nums.length >= 2) {
-                likeCount = parseEngagementNum(nums[0]);
-                retweetCount = parseEngagementNum(nums[1]);
-              }
-            }
-          } catch(e) {}
         }
 
         // ─── VIEWS EXTRACTION (robust) ───

@@ -1,9 +1,6 @@
-const { chromium } = require('playwright-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const { chromium } = require('patchright');
 const fs = require('fs');
 const path = require('path');
-
-chromium.use(StealthPlugin());
 
 const wordpressUrl = process.env.WORDPRESS_URL || 'https://guildera.ai';
 const uploadKey = process.env.WORDPRESS_UPLOAD_KEY || '';
@@ -80,14 +77,32 @@ function extractDateFromText(text) {
 }
 
 (async () => {
-  const browser = await chromium.launch({
+  const proxyHost = process.env.PROXY_HOST || '';
+  const proxyPort = process.env.PROXY_PORT || '';
+  const proxyUser = process.env.PROXY_USER || '';
+  const proxyPass = process.env.PROXY_PASS || '';
+
+  const launchOptions = {
     headless: true,
+    channel: 'chrome',
     args: [
-      '--disable-blink-features=AutomationControlled',
       '--no-sandbox',
       '--disable-setuid-sandbox'
     ]
-  });
+  };
+
+  if (proxyHost && proxyPort) {
+    launchOptions.proxy = {
+      server: `http://${proxyHost}:${proxyPort}`,
+      username: proxyUser || undefined,
+      password: proxyPass || undefined
+    };
+    console.log(`Using proxy: ${proxyHost}:${proxyPort}`);
+  } else {
+    console.log('No proxy configured, using direct connection');
+  }
+
+  const browser = await chromium.launch(launchOptions);
 
   let storageStatePath = path.join(__dirname, 'state.json');
   if (process.env.X_STATE) {

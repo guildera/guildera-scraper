@@ -58,16 +58,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - run: npx playwright install chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: npm install
       - name: Decode auth cookies
         run: echo "$X_STATE" | base64 -d > state.json
         env:
@@ -88,3 +79,7 @@ jobs:
           MIN_RETWEETS: ${{ github.event.inputs.min_retweets || '0' }}
           MIN_REPLIES: ${{ github.event.inputs.min_replies || '0' }}
           MIN_VIEWS: ${{ github.event.inputs.min_views || '0' }}
+          PROXY_HOST: ${{ secrets.PROXY_HOST }}
+          PROXY_PORT: ${{ secrets.PROXY_PORT }}
+          PROXY_USER: ${{ secrets.PROXY_USER }}
+          PROXY_PASS: ${{ secrets.PROXY_PASS }}

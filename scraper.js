@@ -1,6 +1,9 @@
-const { chromium } = require('playwright');
+const { chromium } = require('playwright-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
 const path = require('path');
+
+chromium.use(StealthPlugin());
 
 const wordpressUrl = process.env.WORDPRESS_URL || 'https://guildera.ai';
 const uploadKey = process.env.WORDPRESS_UPLOAD_KEY || '';
@@ -93,8 +96,7 @@ function extractDateFromText(text) {
   }
 
   const contextOptions = {
-    viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+    viewport: { width: 1280, height: 900 }
   };
 
   if (fs.existsSync(storageStatePath)) {

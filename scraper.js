@@ -492,6 +492,25 @@ function extractDateFromText(text) {
     }
   } else {
     console.log('No posts to save.');
+    // Report completion with 0 posts so WordPress knows we're done
+    try {
+      const completeResp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_scrape_complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Auth-Key': uploadKey,
+        },
+        body: JSON.stringify({
+          api_key_hash: keyHash,
+          search_query: process.env.SEARCH_QUERY || '',
+          posts_found: 0,
+        }),
+      });
+      const completeText = await completeResp.text();
+      console.log(`WordPress scrape_complete response (${completeResp.status}): ${completeText.substring(0, 200)}`);
+    } catch (err) {
+      console.log(`WordPress scrape_complete error: ${err.message}`);
+    }
   }
 
   await context.close();

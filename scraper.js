@@ -171,6 +171,21 @@ function extractDateFromText(text) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(4000);
 
+  // Debug: check what's on the page
+  const pageTitle = await page.title();
+  const articleCount = await page.locator('article').count();
+  const loginWall = await page.locator('[data-testid="loginButton"], [data-testid="signupButton"]').count();
+  const bodyText = await page.locator('body').innerText({ timeout: 3000 });
+  const bodySnippet = (bodyText || '').substring(0, 500);
+  console.log(`Page title: "${pageTitle}" | Articles: ${articleCount} | Login wall: ${loginWall}`);
+  console.log(`Body snippet: ${bodySnippet.substring(0, 200)}`);
+  if (loginWall > 0) {
+    console.log('ERROR: X is showing a login wall. Your X_STATE cookies are likely expired. Update the X_STATE secret in GitHub.');
+  }
+  if (articleCount === 0 && loginWall === 0) {
+    console.log('WARNING: No articles found and no login wall. X may have changed their HTML structure.');
+  }
+
   const collectedIds = new Set();
   const posts = [];
   let scrollAttempts = 0;

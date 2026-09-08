@@ -28,6 +28,7 @@ const minLikes = parseInt(process.env.MIN_LIKES || config.min_likes || '0', 10) 
 const minRetweets = parseInt(process.env.MIN_RETWEETS || config.min_retweets || '0', 10) || 0;
 const minReplies = parseInt(process.env.MIN_REPLIES || config.min_replies || '0', 10) || 0;
 const minViews = parseInt(process.env.MIN_VIEWS || config.min_views || '0', 10) || 0;
+const sourceAccount = process.env.SOURCE_ACCOUNT || config.source_account || '';
 
 if (!wordpressUrl || !uploadKey) {
   console.error('Missing WORDPRESS_URL or WORDPRESS_UPLOAD_KEY');
@@ -150,6 +151,7 @@ function extractDateFromText(text) {
     }
     case 'keyword': {
       let q = encodeURIComponent(target);
+      if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
       if (startDate) q += `%20since:${startDate}`;
       if (endDate) q += `%20until:${endDate}`;
       if (minLikes > 0) q += `%20min_faves:${minLikes}`;
@@ -162,6 +164,7 @@ function extractDateFromText(text) {
       let tagText = target.replace('$', '').trim();
       let tag = tagText.split(/\s+/)[0];
       let q = `%24${encodeURIComponent(tag)}`;
+      if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
       const sinceMatch = target.match(/\bsince:(\S+)/i);
       const untilMatch = target.match(/\buntil:(\S+)/i);
       if (sinceMatch) q += `%20since:${sinceMatch[1]}`;
@@ -466,8 +469,12 @@ function extractDateFromText(text) {
   });
 
   const beforeFilter = unique.length;
+  if (minLikes > 0) unique = unique.filter(p => (p.like_count || 0) >= minLikes);
+  if (unique.length < beforeFilter) console.log(`Like filter: ${beforeFilter} -> ${unique.length} posts (min_likes=${minLikes})`);
+
+  const beforeViewFilter = unique.length;
   if (minViews > 0) unique = unique.filter(p => (p.view_count || 0) >= minViews);
-  if (unique.length < beforeFilter) console.log(`View filter: ${beforeFilter} -> ${unique.length} posts (min_views=${minViews})`);
+  if (unique.length < beforeViewFilter) console.log(`View filter: ${beforeViewFilter} -> ${unique.length} posts (min_views=${minViews})`);
 
   console.log(`Saving ${unique.length} posts to WordPress (${wordpressUrl})...`);
 

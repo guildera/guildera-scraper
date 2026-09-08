@@ -48,6 +48,11 @@ on:
         required: false
         default: '0'
         type: string
+      source_account:
+        description: 'Filter by specific account (e.g. @my_mad89)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   scrape:
@@ -79,6 +84,7 @@ jobs:
           MIN_RETWEETS: ${{ github.event.inputs.min_retweets || '0' }}
           MIN_REPLIES: ${{ github.event.inputs.min_replies || '0' }}
           MIN_VIEWS: ${{ github.event.inputs.min_views || '0' }}
+          SOURCE_ACCOUNT: ${{ github.event.inputs.source_account || '' }}
           PROXY_HOST: ${{ secrets.PROXY_HOST }}
           PROXY_PORT: ${{ secrets.PROXY_PORT }}
           PROXY_USER: ${{ secrets.PROXY_USER }}

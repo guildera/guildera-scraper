@@ -28,6 +28,7 @@ const minReplies = parseInt(process.env.MIN_REPLIES || config.min_replies || '0'
 const minViews = parseInt(process.env.MIN_VIEWS || config.min_views || '0', 10) || 0;
 const sourceAccount = process.env.SOURCE_ACCOUNT || config.source_account || '';
 const sortBy = process.env.SORT_BY || config.sort_by || 'default';
+const filterReplies = process.env.FILTER_REPLIES || config.filter_replies || 'all';
 
 if (!wordpressUrl || !uploadKey) {
   console.error('Missing WORDPRESS_URL or WORDPRESS_UPLOAD_KEY');
@@ -91,8 +92,15 @@ function parseEngagementNum(str) {
   const page = await context.newPage();
 
   let url = '';
+  // Build post type filter for X search operators
+  let postTypeFilter = '';
+  if (filterReplies === 'posts') postTypeFilter = '%20-is:quote%20-is:reply';
+  else if (filterReplies === 'replies') postTypeFilter = '%20-is:quote%20is:reply';
+
   if (rawQuery) {
-    url = `https://x.com/search?q=${encodeURIComponent(rawQuery)}&src=typed_query&f=live`;
+    // Append filter to raw query
+    const sep = rawQuery.includes('-is:') ? '' : '%20';
+    url = `https://x.com/search?q=${encodeURIComponent(rawQuery)}${postTypeFilter}&src=typed_query&f=live`;
   } else {
     switch (sourceType) {
       case 'user': {
@@ -108,6 +116,7 @@ function parseEngagementNum(str) {
         if (minLikes > 0) q += `%20min_faves:${minLikes}`;
         if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
         if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+        q += postTypeFilter;
         url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
         break;
       }
@@ -119,6 +128,7 @@ function parseEngagementNum(str) {
         if (minLikes > 0) q += `%20min_faves:${minLikes}`;
         if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
         if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+        q += postTypeFilter;
         url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
         break;
       }
@@ -136,6 +146,7 @@ function parseEngagementNum(str) {
         if (minLikes > 0) q += `%20min_faves:${minLikes}`;
         if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
         if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+        q += postTypeFilter;
         url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
         break;
       }

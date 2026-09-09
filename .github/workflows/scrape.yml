@@ -58,6 +58,11 @@ on:
         required: false
         default: 'default'
         type: string
+      filter_replies:
+        description: 'Post type filter: all, posts, replies'
+        required: false
+        default: 'all'
+        type: string
 
 jobs:
   scrape:
@@ -91,6 +96,7 @@ jobs:
           MIN_VIEWS: ${{ github.event.inputs.min_views || '0' }}
           SOURCE_ACCOUNT: ${{ github.event.inputs.source_account || '' }}
           SORT_BY: ${{ github.event.inputs.sort_by || 'default' }}
+          FILTER_REPLIES: ${{ github.event.inputs.filter_replies || 'all' }}
           PROXY_HOST: ${{ secrets.PROXY_HOST }}
           PROXY_PORT: ${{ secrets.PROXY_PORT }}
           PROXY_USER: ${{ secrets.PROXY_USER }}

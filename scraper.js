@@ -29,6 +29,7 @@ const minRetweets = parseInt(process.env.MIN_RETWEETS || config.min_retweets || 
 const minReplies = parseInt(process.env.MIN_REPLIES || config.min_replies || '0', 10) || 0;
 const minViews = parseInt(process.env.MIN_VIEWS || config.min_views || '0', 10) || 0;
 const sourceAccount = process.env.SOURCE_ACCOUNT || config.source_account || '';
+const sortBy = process.env.SORT_BY || config.sort_by || 'default';
 
 if (!wordpressUrl || !uploadKey) {
   console.error('Missing WORDPRESS_URL or WORDPRESS_UPLOAD_KEY');
@@ -209,7 +210,8 @@ function extractDateFromText(text) {
   const collectedIds = new Set();
   const posts = [];
   let scrollAttempts = 0;
-  const maxScrollAttempts = maxResults * 2;
+  const collectTarget = Math.max(maxResults * 3, maxResults + 20); // collect extra to account for filtering
+  const maxScrollAttempts = collectTarget * 2;
   let consecutiveEmptyScrolls = 0;
   const username = target.replace('@', '').trim();
 
@@ -217,7 +219,7 @@ function extractDateFromText(text) {
     const articleCount = await page.locator('article').count();
     let newCount = 0;
     for (let i = 0; i < articleCount; i++) {
-      if (posts.length >= maxResults) break;
+      if (posts.length >= collectTarget) break;
       try {
         const tweet = page.locator('article').nth(i);
         const text = await tweet.innerText({ timeout: 5000 });
@@ -415,6 +417,16 @@ function extractDateFromText(text) {
           } catch(e) {}
         }
 
+        // Pre-filter by sort_by engagement thresholds (skip low-quality posts early)
+        if (sortBy === 'likes' && likeCount < 3) { continue; }
+        if (sortBy === 'retweets' && retweetCount < 2) { continue; }
+        if (sortBy === 'views' && viewCount < 200) { continue; }
+        if (sortBy === 'engagement') {
+          const totalEng = likeCount + retweetCount + replyCount;
+          const engRate = viewCount > 0 ? totalEng / viewCount : 0;
+          if (engRate < 0.005 && totalEng < 5) { continue; }
+        }
+
         posts.push({
           tweet_id: tweetId || `unknown-${Date.now()}-${i}`,
           author: tweetAuthor,
@@ -442,9 +454,9 @@ function extractDateFromText(text) {
     return newCount;
   }
 
-  while (scrollAttempts < maxScrollAttempts && posts.length < maxResults) {
+  while (scrollAttempts < maxScrollAttempts && posts.length < collectTarget) {
     const newPosts = await extractPostsFromDOM();
-    console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${maxResults})`);
+    console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget})`);
     if (newPosts === 0) {
       consecutiveEmptyScrolls++;
       if (consecutiveEmptyScrolls >= 3) {
@@ -454,12 +466,12 @@ function extractDateFromText(text) {
     } else {
       consecutiveEmptyScrolls = 0;
     }
-    if (posts.length >= maxResults) break;
+    if (posts.length >= collectTarget) break;
     await page.evaluate(() => window.scrollBy(0, 2400));
     await page.waitForTimeout(1500);
     scrollAttempts++;
   }
-  console.log(`Final collection: ${posts.length} posts`);
+  console.log(`Final collection: ${posts.length} posts (target was ${collectTarget})`);
 
   const seen = new Set();
   let unique = posts.filter(p => {
@@ -475,6 +487,12 @@ function extractDateFromText(text) {
   const beforeViewFilter = unique.length;
   if (minViews > 0) unique = unique.filter(p => (p.view_count || 0) >= minViews);
   if (unique.length < beforeViewFilter) console.log(`View filter: ${beforeViewFilter} -> ${unique.length} posts (min_views=${minViews})`);
+
+  // Trim to maxResults after filtering
+  if (unique.length > maxResults) {
+    unique = unique.slice(0, maxResults);
+    console.log(`Trimmed to ${maxResults} posts`);
+  }
 
   console.log(`Saving ${unique.length} posts to WordPress (${wordpressUrl})...`);
 

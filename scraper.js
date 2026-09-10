@@ -180,8 +180,7 @@ function parseEngagementNum(str) {
   const collectedIds = new Set();
   let posts = [];
   let scrollAttempts = 0;
-  const hasEngagementFilters = sortBy !== 'default' || minLikes > 0 || minRetweets > 0 || minViews > 0;
-  const collectTarget = hasEngagementFilters ? Math.ceil(maxResults * 1.5) : maxResults;
+  const collectTarget = maxResults;
   const maxScrollAttempts = collectTarget * 3;
   let consecutiveEmptyScrolls = 0;
   const username = target.replace('@', '').trim();

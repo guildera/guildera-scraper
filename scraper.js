@@ -382,6 +382,7 @@ function parseEngagementNum(str) {
   }
 
   while (scrollAttempts < maxScrollAttempts && posts.length < collectTarget) {
+    const prevCount = posts.length;
     const newPosts = await extractPostsFromDOM();
     console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} (total: ${posts.length}/${collectTarget})`);
     if (newPosts === 0) {
@@ -395,7 +396,18 @@ function parseEngagementNum(str) {
     }
     if (posts.length >= collectTarget) break;
     await page.evaluate(() => window.scrollBy(0, 2400));
-    await page.waitForTimeout(1200);
+    // Wait for new articles to appear in DOM (up to 3s)
+    try {
+      await page.waitForFunction(
+        (prevArticleCount) => document.querySelectorAll('article').length > prevArticleCount,
+        { timeout: 3000 },
+        await page.locator('article').count()
+      );
+      await page.waitForTimeout(400); // extra settle time
+    } catch (e) {
+      // No new articles loaded, wait fixed time anyway
+      await page.waitForTimeout(1000);
+    }
     scrollAttempts++;
   }
   console.log(`Final collection: ${posts.length} posts`);

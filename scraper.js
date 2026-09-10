@@ -95,6 +95,7 @@ function parseEngagementNum(str) {
   // Build X search operators
   let searchOps = '';
   if (filterReplies === 'posts') searchOps += '%20-is:quote%20-is:reply';
+  else if (filterReplies === 'posts_include_quotes') searchOps += '%20-is:reply';
   else if (filterReplies === 'replies') searchOps += '%20-is:quote%20is:reply';
   if (mediaOnly) searchOps += '%20has:media';
 

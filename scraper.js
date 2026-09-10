@@ -386,8 +386,8 @@ function parseEngagementNum(str) {
     console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} (total: ${posts.length}/${collectTarget})`);
     if (newPosts === 0) {
       consecutiveEmptyScrolls++;
-      if (consecutiveEmptyScrolls >= 3) {
-        console.log('3 consecutive empty scrolls — no more posts');
+      if (consecutiveEmptyScrolls >= 5) {
+        console.log('5 consecutive empty scrolls — no more posts');
         break;
       }
     } else {
@@ -395,7 +395,7 @@ function parseEngagementNum(str) {
     }
     if (posts.length >= collectTarget) break;
     await page.evaluate(() => window.scrollBy(0, 2400));
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1200);
     scrollAttempts++;
   }
   console.log(`Final collection: ${posts.length} posts`);

@@ -276,12 +276,10 @@ function parseEngagementNum(str) {
           }
 
           // Always try to extract retweet count from data-testid (needed for quoted posts)
-          let retweetTestid = 'none';
           if (!retweetCount) {
             const rtEl = article.querySelector('[data-testid="retweet"]');
             if (rtEl) {
               const val = rtEl.getAttribute('aria-label') || rtEl.textContent || '';
-              retweetTestid = val.substring(0, 50);
               const m = val.match(/([\d,.]+[KkMm]?)/);
               if (m) retweetCount = m[1];
             }
@@ -302,22 +300,18 @@ function parseEngagementNum(str) {
             if (quoteEl) quoteCount = quoteEl.getAttribute('aria-label') || '';
           }
 
-          // Detect quoted/retweeted posts — check for inner article (nested)
+          // Skip view fallback for quoted/retweeted posts
           const isQuotedPost = !!article.querySelector('article');
           const isRetweet = text.includes('reposted') || text.includes('Reposted');
           const skipViewFallback = isQuotedPost || isRetweet;
 
           // View count: only use Strategy 1 (analytics link), skip quoted/retweeted
           let viewCount = 0;
-          let viewAnchorCount = 0;
-          let viewAnchorText = 'none';
           if (!skipViewFallback) {
             const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
-            viewAnchorCount = viewAnchors.length;
             const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
             if (viewAnchor) {
               const vt = viewAnchor.innerText || '';
-              viewAnchorText = vt.substring(0, 50);
               // Match number (with K/M suffix) — analytics link text is just the number, no "Views" word
               const vm = vt.match(/([\d.,]+[KkMm]?)/);
               if (vm) viewCount = vm[1];
@@ -341,13 +335,7 @@ function parseEngagementNum(str) {
             author_avatar: authorAvatar,
             is_verified: isVerified,
             _groups: groupEls.length,
-            _hasQuote: isQuotedPost,
-            _isRetweet: isRetweet,
             _groupText: groupEl ? (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80) : '',
-            _viewAnchors: viewAnchorCount,
-            _viewAnchorText: viewAnchorText,
-            _skipView: skipViewFallback,
-            _rtTestid: retweetTestid,
           });
         } catch (e) {
           // skip broken article
@@ -381,9 +369,6 @@ function parseEngagementNum(str) {
         const weightedEng = likeCount * 1.0 + replyCount * 1.5 + viewCount * 0.001;
         if (weightedEng < 3) continue;
       }
-
-      // DEBUG: log engagement for ALL posts
-      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' rtTestid="' + raw._rtTestid + '" group="' + raw._groupText + '"');
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });
       added++;

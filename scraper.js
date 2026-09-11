@@ -316,7 +316,8 @@ function parseEngagementNum(str) {
             if (viewAnchor) {
               const vt = viewAnchor.innerText || '';
               viewAnchorText = vt.substring(0, 50);
-              const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
+              // Match number (with K/M suffix) — analytics link text is just the number, no "Views" word
+              const vm = vt.match(/([\d.,]+[KkMm]?)/);
               if (vm) viewCount = vm[1];
             }
           }

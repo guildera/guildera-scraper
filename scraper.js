@@ -324,11 +324,11 @@ function parseEngagementNum(str) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
             if (nums.length >= 4) {
-              likeCount = nums[0]; retweetCount = nums[1]; replyCount = nums[2]; quoteCount = nums[3];
+              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; quoteCount = nums[3];
             } else if (nums.length === 3) {
-              likeCount = nums[0]; replyCount = nums[1]; // nums[2] is views for quoted posts
+              replyCount = nums[0]; likeCount = nums[1]; // nums[2] is views for quoted posts
             } else if (nums.length === 2) {
-              likeCount = nums[0]; replyCount = nums[1];
+              replyCount = nums[0]; likeCount = nums[1];
             }
           }
 

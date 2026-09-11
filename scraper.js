@@ -307,11 +307,15 @@ function parseEngagementNum(str) {
 
           // View count: only use Strategy 1 (analytics link), skip quoted/retweeted
           let viewCount = 0;
+          let viewAnchorCount = 0;
+          let viewAnchorText = 'none';
           if (!skipViewFallback) {
             const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
+            viewAnchorCount = viewAnchors.length;
             const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
             if (viewAnchor) {
               const vt = viewAnchor.innerText || '';
+              viewAnchorText = vt.substring(0, 50);
               const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
               if (vm) viewCount = vm[1];
             }
@@ -337,6 +341,9 @@ function parseEngagementNum(str) {
             _hasQuote: isQuotedPost,
             _isRetweet: isRetweet,
             _groupText: groupEl ? (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80) : '',
+            _viewAnchors: viewAnchorCount,
+            _viewAnchorText: viewAnchorText,
+            _skipView: skipViewFallback,
           });
         } catch (e) {
           // skip broken article
@@ -372,7 +379,7 @@ function parseEngagementNum(str) {
       }
 
       // DEBUG: log engagement for ALL posts
-      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' isRT=' + raw._isRetweet + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' group="' + raw._groupText + '"');
+      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' isRT=' + raw._isRetweet + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' skipView=' + raw._skipView + ' anchors=' + raw._viewAnchors + ' anchorText="' + raw._viewAnchorText + '" group="' + raw._groupText + '"');
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });
       added++;

@@ -332,10 +332,6 @@ function parseEngagementNum(str) {
             }
           }
 
-          // Detect quoted/retweeted posts
-          const hasQuoteCard = !!article.querySelector('[data-testid="quote"], article');
-          const isRetweet = (article.innerText || '').includes('reposted') || (article.innerText || '').includes('Reposted');
-
           results.push({
             tweet_id: tweetId,
             author: tweetAuthor,
@@ -353,7 +349,7 @@ function parseEngagementNum(str) {
             author_avatar: authorAvatar,
             is_verified: isVerified,
             _groups: groupEls.length,
-            _hasQuote: hasQuoteCard,
+            _hasQuote: isQuotedPost,
             _isRetweet: isRetweet,
             _groupText: groupEl ? (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80) : '',
           });

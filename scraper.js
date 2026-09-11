@@ -262,6 +262,14 @@ function parseEngagementNum(str) {
           // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
+          // Debug: log all groups found
+          if (groupEls.length > 1) {
+            const allGroupTexts = [];
+            for (let g = 0; g < groupEls.length; g++) {
+              allGroupTexts.push('group' + g + '=' + (groupEls[g].innerText || '').substring(0, 80));
+            }
+            console.log('  QUOTED POST: found ' + groupEls.length + ' groups: ' + allGroupTexts.join(' | '));
+          }
           const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
           if (groupEl) {
             const groupText = groupEl.innerText || '';

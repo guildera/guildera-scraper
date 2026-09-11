@@ -259,9 +259,10 @@ function parseEngagementNum(str) {
           }
           const hasMedia = mediaUrls.length > 0 || text.includes('pic.twitter.com');
 
-          // Engagement from [role="group"]
+          // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
-          const groupEl = article.querySelector('[role="group"]');
+          const groupEls = article.querySelectorAll('[role="group"]');
+          const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
           if (groupEl) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
@@ -289,10 +290,11 @@ function parseEngagementNum(str) {
             if (quoteEl) quoteCount = quoteEl.getAttribute('aria-label') || '';
           }
 
-          // Views — try strategies
+          // Views — try strategies (use LAST analytics link for quoted posts)
           let viewCount = 0;
           // Strategy 1: analytics link
-          const viewAnchor = article.querySelector('a[href*="/analytics"]');
+          const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
+          const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
           if (viewAnchor) {
             const vt = viewAnchor.innerText || '';
             const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);

@@ -313,6 +313,9 @@ function parseEngagementNum(str) {
           }
           const hasMedia = mediaUrls.length > 0 || text.includes('pic.twitter.com');
 
+          // Reply detection
+          const isReply = /^Replying\s+to/i.test(text) || text.includes('Replying to') || text.includes('replied to');
+
           // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
@@ -394,6 +397,7 @@ function parseEngagementNum(str) {
             quote_count: quoteCount,
             view_count: viewCount,
             bookmark_count: bookmarkCount,
+            post_type: isRetweet ? 'retweet' : (isQuotedPost ? 'quoted' : (isReply ? 'reply' : 'post')),
             has_media: hasMedia,
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,

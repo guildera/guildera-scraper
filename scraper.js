@@ -300,8 +300,6 @@ function parseEngagementNum(str) {
             if (quoteEl) quoteCount = quoteEl.getAttribute('aria-label') || '';
           }
 
-          // Views — try strategies
-          let viewCount = 0;
           // Detect quoted/retweeted posts — check for inner article (nested)
           const isQuotedPost = !!article.querySelector('article');
           const isRetweet = text.includes('reposted') || text.includes('Reposted');

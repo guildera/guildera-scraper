@@ -292,8 +292,10 @@ function parseEngagementNum(str) {
 
           // Views — try strategies
           let viewCount = 0;
-          // Check if this is a quoted post (has nested article or quote card)
+          // Check if this is a quoted post or retweet (views unreliable for these)
           const isQuotedPost = !!article.querySelector('[data-testid="quote"], article');
+          const isRetweet = text.includes('reposted') || text.includes('Reposted');
+          const skipViewFallback = isQuotedPost || isRetweet;
 
           // Strategy 1: analytics link (most reliable, use LAST for quoted posts)
           const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
@@ -303,8 +305,8 @@ function parseEngagementNum(str) {
             const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
             if (vm) viewCount = vm[1];
           }
-          // Strategy 2-4: only for non-quoted posts (too unreliable with nested content)
-          if (!viewCount && !isQuotedPost) {
+          // Strategy 2-4: only for regular posts (unreliable for quoted/retweeted posts)
+          if (!viewCount && !skipViewFallback) {
             // Strategy 2: aria-label
             const viewAria = article.querySelector('[aria-label*="view" i], [aria-label*="View" i]');
             if (viewAria) {

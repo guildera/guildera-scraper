@@ -235,10 +235,31 @@ function parseEngagementNum(str) {
           }
           if (!postTime) postTime = new Date().toISOString();
 
-          // Avatar
+          // Avatar — try multiple selectors for lazy-loaded images
           let authorAvatar = '';
-          const avatarEl = article.querySelector('img[src*="profile_images"]');
-          if (avatarEl) authorAvatar = (avatarEl.getAttribute('src') || '').split('?')[0];
+          const avatarSelectors = [
+            'img[src*="profile_images"]',
+            'img[srcset*="profile_images"]',
+            'img[data-src*="profile_images"]',
+            '[data-testid="Tweet-User-Avatar"] img',
+            'a[href*="/" ] > img[src*="pbs.twimg.com"]',
+          ];
+          for (const sel of avatarSelectors) {
+            const el = article.querySelector(sel);
+            if (el) {
+              const src = el.getAttribute('src') || el.getAttribute('data-src') || '';
+              if (src && src.includes('profile_images')) {
+                authorAvatar = src.split('?')[0];
+                break;
+              }
+              // Try srcset
+              const srcset = el.getAttribute('srcset') || '';
+              if (srcset) {
+                const match = srcset.match(/(https:\/\/pbs\.twimg\.com\/profile_images\/[^\s]+)/);
+                if (match) { authorAvatar = match[1].split('?')[0]; break; }
+              }
+            }
+          }
 
           // Verified
           const isVerified = !!article.querySelector('[aria-label="Verified account"], [aria-label="Verified"]');

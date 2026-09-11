@@ -269,13 +269,23 @@ function parseEngagementNum(str) {
             if (nums.length >= 4) {
               likeCount = nums[0]; retweetCount = nums[1]; replyCount = nums[2]; quoteCount = nums[3];
             } else if (nums.length === 3) {
-              likeCount = nums[0]; replyCount = nums[1]; retweetCount = nums[2];
+              likeCount = nums[0]; replyCount = nums[1]; // nums[2] is views for quoted posts
             } else if (nums.length === 2) {
               likeCount = nums[0]; replyCount = nums[1];
             }
           }
 
-          // Engagement fallback: data-testid
+          // Always try to extract retweet count from data-testid (needed for quoted posts)
+          if (!retweetCount) {
+            const rtEl = article.querySelector('[data-testid="retweet"]');
+            if (rtEl) {
+              const val = rtEl.getAttribute('aria-label') || rtEl.textContent || '';
+              const m = val.match(/([\d,.]+[KkMm]?)/);
+              if (m) retweetCount = m[1];
+            }
+          }
+
+          // Engagement fallback: data-testid (only if all counts still 0)
           if (!likeCount && !retweetCount && !replyCount) {
             for (const tid of ['reply', 'retweet', 'like', 'unlike']) {
               const el = article.querySelector('[data-testid="' + tid + '"]');
@@ -292,42 +302,19 @@ function parseEngagementNum(str) {
 
           // Views — try strategies
           let viewCount = 0;
-          // Check if this is a quoted post or retweet (views unreliable for these)
-          const isQuotedPost = !!article.querySelector('[data-testid="quote"], article');
+          // Detect quoted/retweeted posts — check for inner article (nested)
+          const isQuotedPost = !!article.querySelector('article');
           const isRetweet = text.includes('reposted') || text.includes('Reposted');
           const skipViewFallback = isQuotedPost || isRetweet;
 
-          // Strategy 1: analytics link (most reliable, use LAST for quoted posts)
-          const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
-          const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
-          if (viewAnchor) {
-            const vt = viewAnchor.innerText || '';
-            const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
-            if (vm) viewCount = vm[1];
-          }
-          // Strategy 2-4: only for regular posts (unreliable for quoted/retweeted posts)
-          if (!viewCount && !skipViewFallback) {
-            // Strategy 2: aria-label
-            const viewAria = article.querySelector('[aria-label*="view" i], [aria-label*="View" i]');
-            if (viewAria) {
-              const label = viewAria.getAttribute('aria-label') || '';
-              const vm = label.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
-              if (vm) viewCount = vm[1];
-            }
-            // Strategy 3: text with "Views"
-            if (!viewCount) {
-              const allEls = article.querySelectorAll('span, div, a');
-              for (const el of allEls) {
-                const t = el.textContent || '';
-                if (/[\d.,]+[KkMm]?\s*[Vv]iew/i.test(t)) {
-                  const vm = t.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
-                  if (vm) { viewCount = vm[1]; break; }
-                }
-              }
-            }
-            // Strategy 4: regex on post text
-            if (!viewCount) {
-              const vm = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
+          // View count: only use Strategy 1 (analytics link), skip quoted/retweeted
+          let viewCount = 0;
+          if (!skipViewFallback) {
+            const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
+            const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
+            if (viewAnchor) {
+              const vt = viewAnchor.innerText || '';
+              const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
               if (vm) viewCount = vm[1];
             }
           }

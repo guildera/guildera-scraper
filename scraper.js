@@ -323,6 +323,15 @@ function parseEngagementNum(str) {
             }
           }
 
+          // Bookmark count from data-testid
+          let bookmarkCount = 0;
+          const bmEl = article.querySelector('[data-testid="bookmark"]');
+          if (bmEl) {
+            const val = bmEl.getAttribute('aria-label') || bmEl.textContent || '';
+            const m = val.match(/([\d,.]+[KkMm]?)/);
+            if (m) bookmarkCount = m[1];
+          }
+
           // Engagement fallback: data-testid (only if all counts still 0)
           if (!likeCount && !retweetCount && !replyCount) {
             for (const tid of ['reply', 'retweet', 'like', 'unlike']) {
@@ -368,6 +377,7 @@ function parseEngagementNum(str) {
             reply_count: replyCount,
             quote_count: quoteCount,
             view_count: viewCount,
+            bookmark_count: bookmarkCount,
             has_media: hasMedia,
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
@@ -395,6 +405,7 @@ function parseEngagementNum(str) {
       const replyCount = parseEngagementNum(raw.reply_count);
       const quoteCount = parseEngagementNum(raw.quote_count);
       const viewCount = parseEngagementNum(raw.view_count);
+      const bookmarkCount = parseEngagementNum(raw.bookmark_count);
 
       // Media filter
       if (mediaOnly && !raw.has_media) continue;
@@ -404,11 +415,11 @@ function parseEngagementNum(str) {
       if (sortBy === 'retweets' && retweetCount < 2) continue;
       if (sortBy === 'views' && viewCount < 200) continue;
       if (sortBy === 'engagement') {
-        const weightedEng = likeCount * 1.0 + replyCount * 1.5 + viewCount * 0.001;
+        const weightedEng = (likeCount + 2 * bookmarkCount + 3 * retweetCount + (viewCount > 0 ? 13.5 * replyCount / viewCount : 0)) * 1000;
         if (weightedEng < 3) continue;
       }
 
-      posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });
+      posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount, bookmark_count: bookmarkCount });
       added++;
     }
     return added;
@@ -461,7 +472,7 @@ function parseEngagementNum(str) {
     reply_count: p.reply_count || 0,
     quote_count: p.quote_count || 0,
     view_count: p.view_count || 0,
-    bookmark_count: 0,
+    bookmark_count: p.bookmark_count || 0,
     impression_count: 0,
     media_urls: (() => { try { return p.media_urls ? JSON.parse(p.media_urls) : []; } catch(e) { return []; } })(),
     urls: [],

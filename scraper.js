@@ -290,9 +290,12 @@ function parseEngagementNum(str) {
             if (quoteEl) quoteCount = quoteEl.getAttribute('aria-label') || '';
           }
 
-          // Views — try strategies (use LAST analytics link for quoted posts)
+          // Views — try strategies
           let viewCount = 0;
-          // Strategy 1: analytics link
+          // Check if this is a quoted post (has nested article or quote card)
+          const isQuotedPost = !!article.querySelector('[data-testid="quote"], article');
+
+          // Strategy 1: analytics link (most reliable, use LAST for quoted posts)
           const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
           const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
           if (viewAnchor) {
@@ -300,30 +303,31 @@ function parseEngagementNum(str) {
             const vm = vt.match(/([\d.,]+[KkMm]?)\s*Views/i);
             if (vm) viewCount = vm[1];
           }
-          // Strategy 2: aria-label
-          if (!viewCount) {
+          // Strategy 2-4: only for non-quoted posts (too unreliable with nested content)
+          if (!viewCount && !isQuotedPost) {
+            // Strategy 2: aria-label
             const viewAria = article.querySelector('[aria-label*="view" i], [aria-label*="View" i]');
             if (viewAria) {
               const label = viewAria.getAttribute('aria-label') || '';
               const vm = label.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
               if (vm) viewCount = vm[1];
             }
-          }
-          // Strategy 3: text with "Views"
-          if (!viewCount) {
-            const allEls = article.querySelectorAll('span, div, a');
-            for (const el of allEls) {
-              const t = el.textContent || '';
-              if (/[\d.,]+[KkMm]?\s*[Vv]iew/i.test(t)) {
-                const vm = t.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
-                if (vm) { viewCount = vm[1]; break; }
+            // Strategy 3: text with "Views"
+            if (!viewCount) {
+              const allEls = article.querySelectorAll('span, div, a');
+              for (const el of allEls) {
+                const t = el.textContent || '';
+                if (/[\d.,]+[KkMm]?\s*[Vv]iew/i.test(t)) {
+                  const vm = t.match(/([\d.,]+[KkMm]?)\s*[Vv]iew/i);
+                  if (vm) { viewCount = vm[1]; break; }
+                }
               }
             }
-          }
-          // Strategy 4: regex on post text
-          if (!viewCount) {
-            const vm = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
-            if (vm) viewCount = vm[1];
+            // Strategy 4: regex on post text
+            if (!viewCount) {
+              const vm = text.match(/([\d.,]+[KkMm]?)\s*Views/i);
+              if (vm) viewCount = vm[1];
+            }
           }
 
           results.push({

@@ -262,15 +262,16 @@ function parseEngagementNum(str) {
           // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
-          // Debug: log all groups found
+          // Debug: log all groups found for quoted posts
           if (groupEls.length > 1) {
             const allGroupTexts = [];
             for (let g = 0; g < groupEls.length; g++) {
-              allGroupTexts.push('group' + g + '=' + (groupEls[g].innerText || '').substring(0, 80));
+              allGroupTexts.push('g' + g + '="' + (groupEls[g].innerText || '').substring(0, 60).replace(/\n/g, ' ') + '"');
             }
-            console.log('  QUOTED POST: found ' + groupEls.length + ' groups: ' + allGroupTexts.join(' | '));
+            console.log('  MULTI-GROUP (' + groupEls.length + '): ' + allGroupTexts.join(' | '));
           }
           const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
+          const groupIndex = groupEls.length > 0 ? groupEls.length - 1 : -1;
           if (groupEl) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
@@ -356,6 +357,8 @@ function parseEngagementNum(str) {
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
             is_verified: isVerified,
+            _debug_groups: groupEls.length,
+            _debug_groupIdx: groupIndex,
           });
         } catch (e) {
           // skip broken article
@@ -377,6 +380,11 @@ function parseEngagementNum(str) {
       const replyCount = parseEngagementNum(raw.reply_count);
       const quoteCount = parseEngagementNum(raw.quote_count);
       const viewCount = parseEngagementNum(raw.view_count);
+
+      // Debug: log engagement for posts with multiple groups
+      if (raw._debug_groups > 1) {
+        console.log('  POST groups=' + raw._debug_groups + ' idx=' + raw._debug_groupIdx + ' likes=' + likeCount + ' rt=' + retweetCount + ' replies=' + replyCount + ' views=' + viewCount + ' text=' + raw.text.substring(0, 50).replace(/\n/g, ' '));
+      }
 
       // Media filter
       if (mediaOnly && !raw.has_media) continue;

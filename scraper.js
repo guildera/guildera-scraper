@@ -370,9 +370,8 @@ function parseEngagementNum(str) {
       if (sortBy === 'retweets' && retweetCount < 2) continue;
       if (sortBy === 'views' && viewCount < 200) continue;
       if (sortBy === 'engagement') {
-        const totalEng = likeCount + retweetCount + replyCount;
-        const engRate = viewCount > 0 ? totalEng / viewCount : 0;
-        if (engRate < 0.005 && totalEng < 5) continue;
+        const weightedEng = likeCount * 1.0 + replyCount * 1.5 + retweetCount * 0.5 + viewCount * 0.001;
+        if (weightedEng < 3) continue;
       }
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });

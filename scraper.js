@@ -263,6 +263,13 @@ function parseEngagementNum(str) {
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
           const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
+
+          // DEBUG: log ALL posts engagement source
+          const hasQuote = !!article.querySelector('[data-testid="quote"]');
+          if (groupEl) {
+            const gText = (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80);
+            console.log('  ENG: groups=' + groupEls.length + ' hasQuote=' + hasQuote + ' groupText="' + gText + '"');
+          }
           if (groupEl) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];

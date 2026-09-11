@@ -276,10 +276,12 @@ function parseEngagementNum(str) {
           }
 
           // Always try to extract retweet count from data-testid (needed for quoted posts)
+          let retweetTestid = 'none';
           if (!retweetCount) {
             const rtEl = article.querySelector('[data-testid="retweet"]');
             if (rtEl) {
               const val = rtEl.getAttribute('aria-label') || rtEl.textContent || '';
+              retweetTestid = val.substring(0, 50);
               const m = val.match(/([\d,.]+[KkMm]?)/);
               if (m) retweetCount = m[1];
             }
@@ -345,6 +347,7 @@ function parseEngagementNum(str) {
             _viewAnchors: viewAnchorCount,
             _viewAnchorText: viewAnchorText,
             _skipView: skipViewFallback,
+            _rtTestid: retweetTestid,
           });
         } catch (e) {
           // skip broken article
@@ -380,7 +383,7 @@ function parseEngagementNum(str) {
       }
 
       // DEBUG: log engagement for ALL posts
-      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' isRT=' + raw._isRetweet + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' skipView=' + raw._skipView + ' anchors=' + raw._viewAnchors + ' anchorText="' + raw._viewAnchorText + '" group="' + raw._groupText + '"');
+      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' rtTestid="' + raw._rtTestid + '" group="' + raw._groupText + '"');
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });
       added++;

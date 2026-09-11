@@ -263,13 +263,6 @@ function parseEngagementNum(str) {
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
           const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
-
-          // DEBUG: log ALL posts engagement source
-          const hasQuote = !!article.querySelector('[data-testid="quote"]');
-          if (groupEl) {
-            const gText = (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80);
-            console.log('  ENG: groups=' + groupEls.length + ' hasQuote=' + hasQuote + ' groupText="' + gText + '"');
-          }
           if (groupEl) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
@@ -339,6 +332,10 @@ function parseEngagementNum(str) {
             }
           }
 
+          // Detect quoted/retweeted posts
+          const hasQuoteCard = !!article.querySelector('[data-testid="quote"], article');
+          const isRetweet = (article.innerText || '').includes('reposted') || (article.innerText || '').includes('Reposted');
+
           results.push({
             tweet_id: tweetId,
             author: tweetAuthor,
@@ -355,6 +352,10 @@ function parseEngagementNum(str) {
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
             is_verified: isVerified,
+            _groups: groupEls.length,
+            _hasQuote: hasQuoteCard,
+            _isRetweet: isRetweet,
+            _groupText: groupEl ? (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80) : '',
           });
         } catch (e) {
           // skip broken article
@@ -388,6 +389,9 @@ function parseEngagementNum(str) {
         const weightedEng = likeCount * 1.0 + replyCount * 1.5 + viewCount * 0.001;
         if (weightedEng < 3) continue;
       }
+
+      // DEBUG: log engagement for ALL posts
+      console.log('  POST groups=' + raw._groups + ' hasQuote=' + raw._hasQuote + ' isRT=' + raw._isRetweet + ' likes=' + likeCount + ' rt=' + retweetCount + ' views=' + viewCount + ' group="' + raw._groupText + '"');
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount });
       added++;

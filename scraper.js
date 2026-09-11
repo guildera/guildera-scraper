@@ -264,19 +264,36 @@ function parseEngagementNum(str) {
           // Verified
           const isVerified = !!article.querySelector('[aria-label="Verified account"], [aria-label="Verified"]');
 
-          // Media
+          // Media — try multiple selectors for lazy-loaded images
           const mediaUrls = [];
-          const imgs = article.querySelectorAll('img[src*="pbs.twimg.com/media"], img[src*="pbs.twimg.com/card_media"], img[src*="pbs.twimg.com/ext_tw_video"]');
-          for (const img of imgs) {
-            const src = img.getAttribute('src') || '';
-            if (src && !src.includes('profile_images') && !src.includes('emoji')) {
-              mediaUrls.push(src.split('?')[0]);
+          const mediaSelectors = [
+            'img[src*="pbs.twimg.com/media"]',
+            'img[srcset*="pbs.twimg.com/media"]',
+            'img[data-src*="pbs.twimg.com/media"]',
+            'img[src*="pbs.twimg.com/card_media"]',
+            'img[src*="pbs.twimg.com/ext_tw_video"]',
+            '[data-testid="tweetPhoto"] img',
+            '[data-testid="videoPlayer"] video',
+            '[data-testid="videoPlayerContainer"] video',
+          ];
+          const seenMedia = new Set();
+          for (const sel of mediaSelectors) {
+            const els = article.querySelectorAll(sel);
+            for (const el of els) {
+              let src = el.getAttribute('src') || el.getAttribute('data-src') || '';
+              // Try srcset
+              if (!src) {
+                const srcset = el.getAttribute('srcset') || '';
+                if (srcset) {
+                  const match = srcset.match(/(https:\/\/pbs\.twimg\.com\/media\/[^\s,]+)/);
+                  if (match) src = match[1];
+                }
+              }
+              if (src && !src.includes('profile_images') && !src.includes('emoji') && !seenMedia.has(src)) {
+                seenMedia.add(src);
+                mediaUrls.push(src.split('?')[0]);
+              }
             }
-          }
-          const videoEl = article.querySelector('[data-testid="videoPlayer"] video, [data-testid="videoPlayerContainer"] video');
-          if (videoEl) {
-            const vs = videoEl.getAttribute('src');
-            if (vs) mediaUrls.push(vs);
           }
           const hasMedia = mediaUrls.length > 0 || text.includes('pic.twitter.com');
 

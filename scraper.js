@@ -316,57 +316,36 @@ function parseEngagementNum(str) {
           // Reply detection
           const isReply = /^Replying\s+to/i.test(text) || text.includes('Replying to') || text.includes('replied to');
 
-          // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
-          // Order: reply, retweet, like, bookmark, view (up to 5 numbers)
+          // Engagement: use data-testid selectors for accuracy
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0, bookmarkCount = 0, viewCount = 0;
-          const groupEls = article.querySelectorAll('[role="group"]');
-          const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
-          if (groupEl) {
-            const groupText = groupEl.innerText || '';
-            const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
-            if (nums.length >= 5) {
-              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; bookmarkCount = nums[3]; viewCount = nums[4];
-            } else if (nums.length === 4) {
-              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; viewCount = nums[3];
-            } else if (nums.length === 3) {
-              replyCount = nums[0]; likeCount = nums[1]; viewCount = nums[2];
-            } else if (nums.length === 2) {
-              replyCount = nums[0]; likeCount = nums[1];
-            }
-          }
 
-          // Always try to extract retweet count from data-testid (needed for quoted posts)
-          if (!retweetCount) {
-            const rtEl = article.querySelector('[data-testid="retweet"]');
-            if (rtEl) {
-              const val = rtEl.getAttribute('aria-label') || rtEl.textContent || '';
+          // Helper: extract count from data-testid element's data-animated-count-visual
+          function getCountFromTestId(tid) {
+            const el = article.querySelector('[data-testid="' + tid + '"]');
+            if (!el) return 0;
+            // Try data-animated-count-visual first (X's count display)
+            const countEl = el.querySelector('[data-animated-count-visual]');
+            if (countEl) {
+              const val = countEl.textContent || '';
               const m = val.match(/([\d,.]+[KkMm]?)/);
-              if (m) retweetCount = m[1];
+              if (m) return m[1];
             }
+            // Fallback: aria-label or textContent
+            const val = el.getAttribute('aria-label') || el.textContent || '';
+            const m = val.match(/([\d,.]+[KkMm]?)/);
+            return m ? m[1] : 0;
           }
 
-          // Engagement fallback: data-testid (only if all counts still 0)
-          if (!likeCount && !retweetCount && !replyCount) {
-            for (const tid of ['reply', 'retweet', 'like', 'unlike']) {
-              const el = article.querySelector('[data-testid="' + tid + '"]');
-              if (el) {
-                const val = el.getAttribute('aria-label') || el.textContent || '';
-                if (tid === 'reply') replyCount = val;
-                else if (tid === 'retweet') retweetCount = val;
-                else if (tid === 'like' || tid === 'unlike') likeCount = val;
-              }
-            }
-            const quoteEl = article.querySelector('[data-testid="quote"]');
-            if (quoteEl) quoteCount = quoteEl.getAttribute('aria-label') || '';
-          }
+          replyCount = getCountFromTestId('reply');
+          retweetCount = getCountFromTestId('retweet');
+          likeCount = getCountFromTestId('like') || getCountFromTestId('unlike');
+          bookmarkCount = getCountFromTestId('bookmark') || getCountFromTestId('unbookmark');
+          quoteCount = getCountFromTestId('quote');
 
-          // Skip view fallback for quoted/retweeted posts
+          // View count from analytics link (outside the group)
           const isQuotedPost = !!article.querySelector('article');
           const isRetweet = text.includes('reposted') || text.includes('Reposted');
-          const skipViewFallback = isQuotedPost || isRetweet;
-
-          // View count: use group-parsed value, fallback to analytics link
-          if (!viewCount && !skipViewFallback) {
+          if (!isQuotedPost && !isRetweet) {
             const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
             const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
             if (viewAnchor) {
@@ -394,8 +373,8 @@ function parseEngagementNum(str) {
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
             is_verified: isVerified,
-            _groups: groupEls.length,
-            _groupText: groupEl ? (groupEl.innerText || '').replace(/\n/g, ' ').substring(0, 80) : '',
+            _groups: 0,
+            _groupText: '',
           });
         } catch (e) {
           // skip broken article

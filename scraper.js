@@ -341,26 +341,35 @@ function parseEngagementNum(str) {
             else if (label.includes('quote')) quoteCount = m[1];
           }
 
-          // Strategy 2: Fallback to data-testid selectors
-          if (!likeCount && !retweetCount && !replyCount) {
-            function getCountFromTestId(tid) {
-              const el = article.querySelector('[data-testid="' + tid + '"]');
-              if (!el) return 0;
-              const countEl = el.querySelector('[data-animated-count-visual]');
-              if (countEl) {
-                const val = countEl.textContent || '';
-                const m = val.match(/([\d,.]+[KkMm]?)/);
-                if (m) return m[1];
-              }
-              const val = el.getAttribute('aria-label') || el.textContent || '';
+          // Strategy 2: Fallback to data-testid selectors for any metrics still at 0
+          function getCountFromTestId(tid) {
+            const el = article.querySelector('[data-testid="' + tid + '"]');
+            if (!el) return 0;
+            const countEl = el.querySelector('[data-animated-count-visual]');
+            if (countEl) {
+              const val = countEl.textContent || '';
               const m = val.match(/([\d,.]+[KkMm]?)/);
-              return m ? m[1] : 0;
+              if (m) return m[1];
             }
-            replyCount = getCountFromTestId('reply');
-            retweetCount = getCountFromTestId('retweet');
-            likeCount = getCountFromTestId('like') || getCountFromTestId('unlike');
-            bookmarkCount = getCountFromTestId('bookmark') || getCountFromTestId('unbookmark');
-            quoteCount = getCountFromTestId('quote');
+            const val = el.getAttribute('aria-label') || el.textContent || '';
+            const m = val.match(/([\d,.]+[KkMm]?)/);
+            return m ? m[1] : 0;
+          }
+          if (!replyCount) replyCount = getCountFromTestId('reply');
+          if (!retweetCount) retweetCount = getCountFromTestId('retweet');
+          if (!likeCount) likeCount = getCountFromTestId('like') || getCountFromTestId('unlike');
+          if (!bookmarkCount) bookmarkCount = getCountFromTestId('bookmark') || getCountFromTestId('unbookmark');
+          if (!quoteCount) quoteCount = getCountFromTestId('quote');
+
+          // Strategy 3: Bookmark-specific — scan all buttons for bookmark count in text/aria-label
+          if (!bookmarkCount) {
+            for (const btn of allBtns) {
+              const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+              if (!label.includes('bookmark')) continue;
+              const btnText = btn.textContent || '';
+              const bm = btnText.match(/([\d,.]+[KkMm]?)/);
+              if (bm) { bookmarkCount = bm[1]; break; }
+            }
           }
 
           // View count from analytics link (outside the action buttons)

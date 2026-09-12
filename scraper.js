@@ -316,33 +316,49 @@ function parseEngagementNum(str) {
           // Reply detection
           const isReply = /^Replying\s+to/i.test(text) || text.includes('Replying to') || text.includes('replied to');
 
-          // Engagement: use data-testid selectors for accuracy
+          // Engagement: use multiple strategies for accurate extraction
           let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0, bookmarkCount = 0, viewCount = 0;
 
-          // Helper: extract count from data-testid element's data-animated-count-visual
-          function getCountFromTestId(tid) {
-            const el = article.querySelector('[data-testid="' + tid + '"]');
-            if (!el) return 0;
-            // Try data-animated-count-visual first (X's count display)
-            const countEl = el.querySelector('[data-animated-count-visual]');
-            if (countEl) {
-              const val = countEl.textContent || '';
-              const m = val.match(/([\d,.]+[KkMm]?)/);
-              if (m) return m[1];
-            }
-            // Fallback: aria-label or textContent
-            const val = el.getAttribute('aria-label') || el.textContent || '';
+          // Strategy 1: Extract from data-animated-count-visual spans inside the article
+          // X renders counts in spans with data-animated-count-visual inside buttons
+          const allBtns = article.querySelectorAll('button, a[role="link"]');
+          for (const btn of allBtns) {
+            const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+            const countEl = btn.querySelector('[data-animated-count-visual]');
+            if (!countEl) continue;
+            const val = countEl.textContent || '';
             const m = val.match(/([\d,.]+[KkMm]?)/);
-            return m ? m[1] : 0;
+            if (!m) continue;
+            if (label.includes('like') || label.includes('heart')) likeCount = m[1];
+            else if (label.includes('repost') || label.includes('retweet')) retweetCount = m[1];
+            else if (label.includes('reply') || label.includes('comment')) replyCount = m[1];
+            else if (label.includes('bookmark')) bookmarkCount = m[1];
+            else if (label.includes('quote')) quoteCount = m[1];
           }
 
-          replyCount = getCountFromTestId('reply');
-          retweetCount = getCountFromTestId('retweet');
-          likeCount = getCountFromTestId('like') || getCountFromTestId('unlike');
-          bookmarkCount = getCountFromTestId('bookmark') || getCountFromTestId('unbookmark');
-          quoteCount = getCountFromTestId('quote');
+          // Strategy 2: Fallback to data-testid selectors
+          if (!likeCount && !retweetCount && !replyCount) {
+            function getCountFromTestId(tid) {
+              const el = article.querySelector('[data-testid="' + tid + '"]');
+              if (!el) return 0;
+              const countEl = el.querySelector('[data-animated-count-visual]');
+              if (countEl) {
+                const val = countEl.textContent || '';
+                const m = val.match(/([\d,.]+[KkMm]?)/);
+                if (m) return m[1];
+              }
+              const val = el.getAttribute('aria-label') || el.textContent || '';
+              const m = val.match(/([\d,.]+[KkMm]?)/);
+              return m ? m[1] : 0;
+            }
+            replyCount = getCountFromTestId('reply');
+            retweetCount = getCountFromTestId('retweet');
+            likeCount = getCountFromTestId('like') || getCountFromTestId('unlike');
+            bookmarkCount = getCountFromTestId('bookmark') || getCountFromTestId('unbookmark');
+            quoteCount = getCountFromTestId('quote');
+          }
 
-          // View count from analytics link (outside the group)
+          // View count from analytics link (outside the action buttons)
           const isQuotedPost = !!article.querySelector('article');
           const isRetweet = text.includes('reposted') || text.includes('Reposted');
           if (!isQuotedPost && !isRetweet) {

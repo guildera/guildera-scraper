@@ -317,16 +317,19 @@ function parseEngagementNum(str) {
           const isReply = /^Replying\s+to/i.test(text) || text.includes('Replying to') || text.includes('replied to');
 
           // Engagement from [role="group"] — use LAST group (outer post, not quoted post)
-          let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0;
+          // Order: reply, retweet, like, bookmark, view (up to 5 numbers)
+          let likeCount = 0, retweetCount = 0, replyCount = 0, quoteCount = 0, bookmarkCount = 0, viewCount = 0;
           const groupEls = article.querySelectorAll('[role="group"]');
           const groupEl = groupEls.length > 0 ? groupEls[groupEls.length - 1] : null;
           if (groupEl) {
             const groupText = groupEl.innerText || '';
             const nums = groupText.match(/[\d,.]+[KkMm]?/g) || [];
-            if (nums.length >= 4) {
-              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; quoteCount = nums[3];
+            if (nums.length >= 5) {
+              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; bookmarkCount = nums[3]; viewCount = nums[4];
+            } else if (nums.length === 4) {
+              replyCount = nums[0]; retweetCount = nums[1]; likeCount = nums[2]; viewCount = nums[3];
             } else if (nums.length === 3) {
-              replyCount = nums[0]; likeCount = nums[1]; // nums[2] is views for quoted posts
+              replyCount = nums[0]; likeCount = nums[1]; viewCount = nums[2];
             } else if (nums.length === 2) {
               replyCount = nums[0]; likeCount = nums[1];
             }
@@ -340,15 +343,6 @@ function parseEngagementNum(str) {
               const m = val.match(/([\d,.]+[KkMm]?)/);
               if (m) retweetCount = m[1];
             }
-          }
-
-          // Bookmark count from data-testid
-          let bookmarkCount = 0;
-          const bmEl = article.querySelector('[data-testid="bookmark"]');
-          if (bmEl) {
-            const val = bmEl.getAttribute('aria-label') || bmEl.textContent || '';
-            const m = val.match(/([\d,.]+[KkMm]?)/);
-            if (m) bookmarkCount = m[1];
           }
 
           // Engagement fallback: data-testid (only if all counts still 0)
@@ -371,14 +365,12 @@ function parseEngagementNum(str) {
           const isRetweet = text.includes('reposted') || text.includes('Reposted');
           const skipViewFallback = isQuotedPost || isRetweet;
 
-          // View count: only use Strategy 1 (analytics link), skip quoted/retweeted
-          let viewCount = 0;
-          if (!skipViewFallback) {
+          // View count: use group-parsed value, fallback to analytics link
+          if (!viewCount && !skipViewFallback) {
             const viewAnchors = article.querySelectorAll('a[href*="/analytics"]');
             const viewAnchor = viewAnchors.length > 0 ? viewAnchors[viewAnchors.length - 1] : null;
             if (viewAnchor) {
               const vt = viewAnchor.innerText || '';
-              // Match number (with K/M suffix) — analytics link text is just the number, no "Views" word
               const vm = vt.match(/([\d.,]+[KkMm]?)/);
               if (vm) viewCount = vm[1];
             }
@@ -435,7 +427,7 @@ function parseEngagementNum(str) {
       if (sortBy === 'retweets' && retweetCount < 2) continue;
       if (sortBy === 'views' && viewCount < 200) continue;
       if (sortBy === 'engagement') {
-        const weightedEng = (likeCount + 2 * bookmarkCount + 3 * retweetCount + (viewCount > 0 ? 13.5 * replyCount / viewCount : 0)) * 1000;
+        const weightedEng = (likeCount + retweetCount + replyCount) + (viewCount > 0 ? viewCount / 25 : 0);
         if (weightedEng < 3) continue;
       }
 

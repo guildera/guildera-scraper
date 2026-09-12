@@ -181,9 +181,14 @@ function parseEngagementNum(str) {
   let posts = [];
   let scrollAttempts = 0;
   const collectTarget = maxResults;
-  const maxScrollAttempts = collectTarget * 3;
+  const maxScrollAttempts = Math.max(collectTarget * 4, 80);
   let consecutiveEmptyScrolls = 0;
   const username = target.replace('@', '').trim();
+
+  // Initial wait for page to fully render
+  await page.waitForTimeout(2000);
+  const initialArticles = await page.evaluate(() => document.querySelectorAll('article').length);
+  console.log(`Initial page load: ${initialArticles} articles in DOM`);
 
   // ─── BATCH EXTRACTION: runs entirely in browser, ONE round-trip ───
   async function extractPostsFromDOM() {
@@ -416,12 +421,12 @@ function parseEngagementNum(str) {
       if (mediaOnly && !raw.has_media) continue;
 
       // Pre-filter by sort_by thresholds
-      if (sortBy === 'likes' && likeCount < 3) continue;
-      if (sortBy === 'retweets' && retweetCount < 2) continue;
-      if (sortBy === 'views' && viewCount < 200) continue;
+      if (sortBy === 'likes' && likeCount < 3) { console.log(`Pre-filter: likes ${likeCount} < 3, skipping`); continue; }
+      if (sortBy === 'retweets' && retweetCount < 2) { console.log(`Pre-filter: retweets ${retweetCount} < 2, skipping`); continue; }
+      if (sortBy === 'views' && viewCount < 200) { console.log(`Pre-filter: views ${viewCount} < 200, skipping`); continue; }
       if (sortBy === 'engagement') {
         const weightedEng = (likeCount + retweetCount + replyCount) + (viewCount > 0 ? viewCount / 25 : 0);
-        if (weightedEng < 3) continue;
+        if (weightedEng < 3) { console.log(`Pre-filter: engagement ${weightedEng.toFixed(1)} < 3, skipping`); continue; }
       }
 
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount, bookmark_count: bookmarkCount });
@@ -433,22 +438,23 @@ function parseEngagementNum(str) {
   while (scrollAttempts < maxScrollAttempts && posts.length < collectTarget) {
     const prevCount = posts.length;
     const newPosts = await extractPostsFromDOM();
-    console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} (total: ${posts.length}/${collectTarget})`);
+    const articlesInDOM = await page.evaluate(() => document.querySelectorAll('article').length);
+    console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM articles: ${articlesInDOM}`);
     if (newPosts === 0) {
       consecutiveEmptyScrolls++;
-      if (consecutiveEmptyScrolls >= 5) {
-        console.log('5 consecutive empty scrolls — no more posts');
+      if (consecutiveEmptyScrolls >= 8) {
+        console.log('8 consecutive empty scrolls — no more posts');
         break;
       }
     } else {
       consecutiveEmptyScrolls = 0;
     }
     if (posts.length >= collectTarget) break;
-    await page.evaluate(() => window.scrollBy(0, 2400));
-    await page.waitForTimeout(1000);
+    await page.evaluate(() => window.scrollBy(0, 3500));
+    await page.waitForTimeout(1500);
     scrollAttempts++;
   }
-  console.log(`Final collection: ${posts.length} posts`);
+  console.log(`Final collection: ${posts.length} posts (before post-filters)`);
 
   // Post-collection filters
   const beforeFilter = posts.length;
@@ -460,6 +466,7 @@ function parseEngagementNum(str) {
   if (posts.length < beforeViewFilter) console.log(`View filter: ${beforeViewFilter} -> ${posts.length} (min_views=${minViews})`);
 
   if (posts.length > maxResults) posts = posts.slice(0, maxResults);
+  console.log(`After all filters: ${posts.length} posts to save (max_results=${maxResults})`);
 
   console.log(`Saving ${posts.length} posts to WordPress...`);
 

@@ -373,8 +373,7 @@ function parseEngagementNum(str) {
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
             is_verified: isVerified,
-            _groups: 0,
-            _groupText: '',
+            _debug: { reply: replyCount, retweet: retweetCount, like: likeCount, bookmark: bookmarkCount, view: viewCount, quote: quoteCount },
           });
         } catch (e) {
           // skip broken article
@@ -389,6 +388,7 @@ function parseEngagementNum(str) {
       if (posts.length >= collectTarget) break;
       if (collectedIds.has(raw.tweet_id)) continue;
       collectedIds.add(raw.tweet_id);
+      console.log(`[RAW] ${raw.username} | likes=${raw.like_count} retweets=${raw.retweet_count} replies=${raw.reply_count} views=${raw.view_count} bookmarks=${raw.bookmark_count} | debug=${JSON.stringify(raw._debug)}`);
 
       // Parse engagement numbers (returned as strings from browser)
       const likeCount = parseEngagementNum(raw.like_count);

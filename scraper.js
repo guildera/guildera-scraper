@@ -505,13 +505,18 @@ function parseEngagementNum(str) {
     }
   } else {
     console.log('No posts to save.');
-    try {
-      await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_scrape_complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth-Key': uploadKey },
-        body: JSON.stringify({ api_key_hash: keyHash, search_query: process.env.SEARCH_QUERY || '', posts_found: 0 }),
-      });
-    } catch (err) {}
+  }
+
+  // Always send completion signal so frontend knows scraper finished
+  try {
+    await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_scrape_complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Key': uploadKey },
+      body: JSON.stringify({ api_key_hash: keyHash, search_query: process.env.SEARCH_QUERY || '', posts_found: toSave.length }),
+    });
+    console.log(`scrape_complete sent: posts_found=${toSave.length}`);
+  } catch (err) {
+    console.log(`scrape_complete error: ${err.message}`);
   }
 
   await context.close();

@@ -322,11 +322,9 @@ function parseEngagementNum(str) {
           // Strategy 1: Extract from data-animated-count-visual spans inside the article
           // X renders counts in spans with data-animated-count-visual inside buttons
           const allBtns = article.querySelectorAll('button, a[role="link"]');
-          let btnLabels = [];
           for (const btn of allBtns) {
             const label = (btn.getAttribute('aria-label') || '').toLowerCase();
             const countEl = btn.querySelector('[data-animated-count-visual]');
-            if (label) btnLabels.push(label + (countEl ? ':' + countEl.textContent.trim() : ''));
             if (!countEl) continue;
             const val = countEl.textContent || '';
             const m = val.match(/([\d,.]+[KkMm]?)/);
@@ -391,8 +389,6 @@ function parseEngagementNum(str) {
             media_urls: mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : '',
             author_avatar: authorAvatar,
             is_verified: isVerified,
-            _debug: { reply: replyCount, retweet: retweetCount, like: likeCount, bookmark: bookmarkCount, view: viewCount, quote: quoteCount },
-            _btns: btnLabels,
           });
         } catch (e) {
           // skip broken article
@@ -407,7 +403,6 @@ function parseEngagementNum(str) {
       if (posts.length >= collectTarget) break;
       if (collectedIds.has(raw.tweet_id)) continue;
       collectedIds.add(raw.tweet_id);
-      console.log(`[RAW] ${raw.username} | likes=${raw.like_count} retweets=${raw.retweet_count} replies=${raw.reply_count} views=${raw.view_count} bookmarks=${raw.bookmark_count} | debug=${JSON.stringify(raw._debug)} | btns=${(raw._btns||[]).join(',')}`);
 
       // Parse engagement numbers (returned as strings from browser)
       const likeCount = parseEngagementNum(raw.like_count);

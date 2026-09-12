@@ -75,7 +75,7 @@ jobs:
           node-version: '22'
       - run: npm install
       - name: Decode auth cookies
-        run: echo "$X_STATE" | base64 -d > state.json
+        run: node -e "const fs=require('fs'); fs.writeFileSync('state.json', Buffer.from(process.env.X_STATE,'base64').toString())"
         env:
           X_STATE: ${{ secrets.X_STATE }}
       - name: Run scraper

@@ -209,11 +209,25 @@ function parseEngagementNum(str) {
 
           let tweetAuthor = username;
           let tweetHandle = '@' + username;
+          let displayName = '';
           if (href) {
             const parts = href.split('/status/');
             if (parts[0]) {
               const handle = parts[0].replace(/^\//, '').trim();
               if (handle) { tweetAuthor = handle; tweetHandle = '@' + handle; }
+            }
+          }
+
+          // Extract real display name from DOM
+          const userNameEl = article.querySelector('div[data-testid="User-Name"]');
+          if (userNameEl) {
+            const spans = userNameEl.querySelectorAll('span');
+            for (const span of spans) {
+              const t = span.textContent.trim();
+              if (t && !t.startsWith('@') && t.length > 0 && t.length < 60) {
+                displayName = t;
+                break;
+              }
             }
           }
 
@@ -387,8 +401,9 @@ function parseEngagementNum(str) {
 
           results.push({
             tweet_id: tweetId,
-            author: tweetAuthor,
+            author: displayName || tweetAuthor,
             username: tweetHandle,
+            display_name: displayName,
             text: text.substring(0, 2000),
             created_at: postTime,
             url: tweetUrl,
@@ -484,7 +499,7 @@ function parseEngagementNum(str) {
     post_id: String(p.tweet_id).startsWith('unknown-') ? '' : String(p.tweet_id),
     author_id: '',
     author_username: p.username ? p.username.replace('@', '') : (p.author || ''),
-    author_name: p.author || '',
+    author_name: p.display_name || p.author || '',
     author_avatar: p.author_avatar || '',
     text: p.text || '',
     created_at: p.created_at || '',

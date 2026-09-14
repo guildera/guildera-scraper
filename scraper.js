@@ -219,7 +219,6 @@ function parseEngagementNum(str) {
           }
 
           // Extract real display name from DOM — multiple strategies
-          let displayName = '';
           // Strategy 1: data-testid="User-Name" — first non-@ span
           const userNameEl = article.querySelector('div[data-testid="User-Name"]');
           if (userNameEl && !displayName) {

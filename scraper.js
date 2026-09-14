@@ -218,16 +218,47 @@ function parseEngagementNum(str) {
             }
           }
 
-          // Extract real display name from DOM
+          // Extract real display name from DOM — multiple strategies
+          let displayName = '';
+          // Strategy 1: data-testid="User-Name" — first non-@ span
           const userNameEl = article.querySelector('div[data-testid="User-Name"]');
-          if (userNameEl) {
+          if (userNameEl && !displayName) {
             const spans = userNameEl.querySelectorAll('span');
             for (const span of spans) {
               const t = span.textContent.trim();
-              if (t && !t.startsWith('@') && t.length > 0 && t.length < 60) {
+              if (t && !t.startsWith('@') && t.length > 0 && t.length < 60 && !/^\d/.test(t)) {
                 displayName = t;
                 break;
               }
+            }
+          }
+          // Strategy 2: Look for user link — first non-@ text inside it
+          if (!displayName) {
+            const userLink = article.querySelector('a[href^="/' + username + '"]');
+            if (userLink) {
+              const spans = userLink.querySelectorAll('span');
+              for (const span of spans) {
+                const t = span.textContent.trim();
+                if (t && !t.startsWith('@') && t !== username && t.length > 0 && t.length < 60 && !/^\d/.test(t)) {
+                  displayName = t;
+                  break;
+                }
+              }
+            }
+          }
+          // Strategy 3: Scan all links in article header area for non-@ text
+          if (!displayName) {
+            const headerLinks = article.querySelectorAll('a[href*="/' + username + '"]');
+            for (const link of headerLinks) {
+              const spans = link.querySelectorAll('span');
+              for (const span of spans) {
+                const t = span.textContent.trim();
+                if (t && !t.startsWith('@') && t !== username && t.length > 1 && t.length < 60 && !/^\d/.test(t)) {
+                  displayName = t;
+                  break;
+                }
+              }
+              if (displayName) break;
             }
           }
 

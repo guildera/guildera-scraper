@@ -562,16 +562,26 @@ function parseEngagementNum(str) {
   }));
 
   if (toSave.length > 0) {
-    try {
-      const resp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_save_posts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Auth-Key': uploadKey },
-        body: JSON.stringify({ posts: toSave }),
-      });
-      console.log(`save_posts response: ${resp.status}`);
-    } catch (err) {
-      console.log(`save_posts error: ${err.message}`);
+    const BATCH_SIZE = 100;
+    let totalSaved = 0;
+    for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+      const batch = toSave.slice(i, i + BATCH_SIZE);
+      try {
+        const resp = await fetch(`${wordpressUrl}/wp-admin/admin-ajax.php?action=guildera_scraper_save_posts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Key': uploadKey },
+          body: JSON.stringify({ posts: batch }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        const saved = body.data?.saved || 0;
+        const skipped = body.data?.skipped || 0;
+        totalSaved += saved;
+        console.log(`Batch ${Math.floor(i/BATCH_SIZE)+1}: sent ${batch.length}, saved ${saved}, skipped ${skipped} (running total: ${totalSaved})`);
+      } catch (err) {
+        console.log(`Batch ${Math.floor(i/BATCH_SIZE)+1} error: ${err.message}`);
+      }
     }
+    console.log(`All batches done: ${totalSaved} new posts saved out of ${toSave.length} sent`);
   } else {
     console.log('No posts to save.');
   }

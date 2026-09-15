@@ -114,6 +114,11 @@ function parseEngagementNum(str) {
           url = `https://x.com/${username}`;
           break;
         }
+        case 'profile_filter': {
+          const profileUser = (sourceAccount || target).replace('@', '').trim();
+          url = `https://x.com/${profileUser}`;
+          break;
+        }
         case 'hashtag': {
           const tag = target.replace('#', '').trim();
           let q = `%23${encodeURIComponent(tag)}`;
@@ -458,26 +463,39 @@ function parseEngagementNum(str) {
       // Media filter
       if (mediaOnly && !raw.has_media) continue;
 
+      // Profile filter: local keyword matching (bypasses X search)
+      if (sourceType === 'profile_filter' && target) {
+        const filterText = target.toLowerCase().replace(/[$#@]/g, '').trim();
+        const postText = (raw.text || '').toLowerCase();
+        const postHashtags = (raw.hashtags || []).map(h => h.toLowerCase().replace('#', ''));
+        const postMentions = (raw.mentions || []).map(m => m.toLowerCase().replace('@', ''));
+        const matchesFilter = postText.includes(filterText) || postHashtags.includes(filterText) || postMentions.includes(filterText);
+        if (!matchesFilter) continue;
+      }
+
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount, bookmark_count: bookmarkCount });
       added++;
     }
     return added;
   }
 
-  // ─── MULTI-PASS SEARCH: run each sort order, merge + deduplicate ───
-  for (let passIdx = 0; passIdx < searchPasses.length; passIdx++) {
-    const sortOrder = searchPasses[passIdx];
+  // ─── MULTI-PASS SEARCH or PROFILE SCROLL ───
+  const isProfileMode = sourceType === 'profile_filter' || sourceType === 'user';
+  const passes = isProfileMode ? ['profile'] : searchPasses;
+
+  for (let passIdx = 0; passIdx < passes.length; passIdx++) {
+    const sortOrder = passes[passIdx];
     const url = buildSearchUrl(sortOrder);
-    console.log(`\n=== PASS ${passIdx + 1}/${searchPasses.length} (${sortOrder}) ===`);
+    console.log(`\n=== ${isProfileMode ? 'PROFILE SCROLL' : 'PASS ' + (passIdx + 1) + '/' + passes.length} (${sortOrder}) ===`);
     console.log(`URL: ${url}`);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     try {
-      await page.waitForSelector('article', { timeout: 10000 });
+      await page.waitForSelector('article', { timeout: 15000 });
       console.log('Articles loaded');
     } catch (e) {
-      console.log('No articles found after 10s, checking page state...');
+      console.log('No articles found after 15s, checking page state...');
       const loginWall = await page.locator('[data-testid="loginButton"], [data-testid="signupButton"]').count();
       if (loginWall > 0) {
         console.log('ERROR: Login wall detected. X_STATE cookies expired.');
@@ -491,16 +509,18 @@ function parseEngagementNum(str) {
 
     let scrollAttempts = 0;
     let consecutiveEmptyScrolls = 0;
-    const passMaxScrolls = Math.max(Math.ceil(collectTarget / searchPasses.length) * 4, 40);
+    const passMaxScrolls = isProfileMode
+      ? Math.max(maxResults * 2, 200)
+      : Math.max(Math.ceil(collectTarget / passes.length) * 4, 40);
 
     while (scrollAttempts < passMaxScrolls && posts.length < collectTarget) {
       const newPosts = await extractPostsFromDOM();
       const articlesInDOM = await page.evaluate(() => document.querySelectorAll('article').length);
-      console.log(`Pass ${passIdx + 1} scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM: ${articlesInDOM}`);
+      console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM: ${articlesInDOM}`);
       if (newPosts === 0) {
         consecutiveEmptyScrolls++;
-        if (consecutiveEmptyScrolls >= 6) {
-          console.log(`Pass ${passIdx + 1}: 6 consecutive empty scrolls — moving to next pass`);
+        if (consecutiveEmptyScrolls >= (isProfileMode ? 8 : 6)) {
+          console.log(`${consecutiveEmptyScrolls} consecutive empty scrolls — ${isProfileMode ? 'end of profile' : 'moving to next pass'}`);
           break;
         }
       } else {
@@ -512,7 +532,7 @@ function parseEngagementNum(str) {
       scrollAttempts++;
     }
 
-    console.log(`Pass ${passIdx + 1} done: ${posts.length} total posts so far`);
+    console.log(`Done: ${posts.length} total posts so far`);
     if (posts.length >= collectTarget) break;
   }
 

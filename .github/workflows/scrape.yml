@@ -63,6 +63,11 @@ on:
         required: false
         default: 'all'
         type: string
+      search_passes:
+        description: 'Multi-pass search: comma-separated sort orders (e.g. top,live)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   scrape:
@@ -97,6 +102,7 @@ jobs:
           SOURCE_ACCOUNT: ${{ github.event.inputs.source_account || '' }}
           SORT_BY: ${{ github.event.inputs.sort_by || 'default' }}
           FILTER_REPLIES: ${{ github.event.inputs.filter_replies || 'all' }}
+          SEARCH_PASSES: ${{ github.event.inputs.search_passes || '' }}
           PROXY_HOST: ${{ secrets.PROXY_HOST }}
           PROXY_PORT: ${{ secrets.PROXY_PORT }}
           PROXY_USER: ${{ secrets.PROXY_USER }}

@@ -91,104 +91,87 @@ function parseEngagementNum(str) {
 
   const page = await context.newPage();
 
-  let url = '';
-  // Build X search operators
-  let searchOps = '';
-  if (filterReplies === 'posts') searchOps += '%20-is:quote%20-is:reply';
-  else if (filterReplies === 'posts_include_quotes') searchOps += '%20-is:reply';
-  else if (filterReplies === 'replies') searchOps += '%20-is:quote%20is:reply';
-  if (mediaOnly) searchOps += '%20has:media';
+  const searchPasses = (process.env.SEARCH_PASSES || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (searchPasses.length === 0) searchPasses.push('live'); // default: live (chronological)
 
-  if (rawQuery) {
-    // Append filter to raw query
-    const sep = rawQuery.includes('-is:') ? '' : '%20';
-    url = `https://x.com/search?q=${encodeURIComponent(rawQuery)}${searchOps}&src=typed_query&f=live`;
-  } else {
-    switch (sourceType) {
-      case 'user': {
-        const username = target.replace('@', '').trim();
-        url = `https://x.com/${username}`;
-        break;
+  function buildSearchUrl(sortOrder) {
+    let url = '';
+    let searchOps = '';
+    if (filterReplies === 'posts') searchOps += '%20-is:quote%20-is:reply';
+    else if (filterReplies === 'posts_include_quotes') searchOps += '%20-is:reply';
+    else if (filterReplies === 'replies') searchOps += '%20-is:quote%20is:reply';
+    if (mediaOnly) searchOps += '%20has:media';
+
+    const sortParam = sortOrder === 'top' ? 'top' : sortOrder === 'live' ? 'live' : '';
+
+    if (rawQuery) {
+      const sep = rawQuery.includes('-is:') ? '' : '%20';
+      url = `https://x.com/search?q=${encodeURIComponent(rawQuery)}${searchOps}&src=typed_query${sortParam ? '&f=' + sortParam : ''}`;
+    } else {
+      switch (sourceType) {
+        case 'user': {
+          const username = target.replace('@', '').trim();
+          url = `https://x.com/${username}`;
+          break;
+        }
+        case 'hashtag': {
+          const tag = target.replace('#', '').trim();
+          let q = `%23${encodeURIComponent(tag)}`;
+          if (startDate) q += `%20since:${startDate}`;
+          if (endDate) q += `%20until:${endDate}`;
+          if (minLikes > 0) q += `%20min_faves:${minLikes}`;
+          if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
+          if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+          q += searchOps;
+          url = `https://x.com/search?q=${q}&src=typed_query${sortParam ? '&f=' + sortParam : ''}`;
+          break;
+        }
+        case 'keyword': {
+          let q = encodeURIComponent(target);
+          if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
+          if (startDate) q += `%20since:${startDate}`;
+          if (endDate) q += `%20until:${endDate}`;
+          if (minLikes > 0) q += `%20min_faves:${minLikes}`;
+          if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
+          if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+          q += searchOps;
+          url = `https://x.com/search?q=${q}&src=typed_query${sortParam ? '&f=' + sortParam : ''}`;
+          break;
+        }
+        case 'cashtag': {
+          let tagText = target.replace('$', '').trim();
+          let tag = tagText.split(/\s+/)[0];
+          let q = `%24${encodeURIComponent(tag)}`;
+          if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
+          const sinceMatch = target.match(/\bsince:(\S+)/i);
+          const untilMatch = target.match(/\buntil:(\S+)/i);
+          if (sinceMatch) q += `%20since:${sinceMatch[1]}`;
+          else if (startDate) q += `%20since:${startDate}`;
+          if (untilMatch) q += `%20until:${untilMatch[1]}`;
+          else if (endDate) q += `%20until:${endDate}`;
+          if (minLikes > 0) q += `%20min_faves:${minLikes}`;
+          if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
+          if (minReplies > 0) q += `%20min_replies:${minReplies}`;
+          q += searchOps;
+          url = `https://x.com/search?q=${q}&src=typed_query${sortParam ? '&f=' + sortParam : ''}`;
+          break;
+        }
+        case 'url': {
+          url = target.startsWith('http') ? target : `https://x.com/${target}`;
+          break;
+        }
+        default:
+          url = `https://x.com/${target.replace('@', '')}`;
       }
-      case 'hashtag': {
-        const tag = target.replace('#', '').trim();
-        let q = `%23${encodeURIComponent(tag)}`;
-        if (startDate) q += `%20since:${startDate}`;
-        if (endDate) q += `%20until:${endDate}`;
-        if (minLikes > 0) q += `%20min_faves:${minLikes}`;
-        if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
-        if (minReplies > 0) q += `%20min_replies:${minReplies}`;
-        q += searchOps;
-        url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
-        break;
-      }
-      case 'keyword': {
-        let q = encodeURIComponent(target);
-        if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
-        if (startDate) q += `%20since:${startDate}`;
-        if (endDate) q += `%20until:${endDate}`;
-        if (minLikes > 0) q += `%20min_faves:${minLikes}`;
-        if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
-        if (minReplies > 0) q += `%20min_replies:${minReplies}`;
-        q += searchOps;
-        url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
-        break;
-      }
-      case 'cashtag': {
-        let tagText = target.replace('$', '').trim();
-        let tag = tagText.split(/\s+/)[0];
-        let q = `%24${encodeURIComponent(tag)}`;
-        if (sourceAccount) q += `%20from:${sourceAccount.replace('@', '')}`;
-        const sinceMatch = target.match(/\bsince:(\S+)/i);
-        const untilMatch = target.match(/\buntil:(\S+)/i);
-        if (sinceMatch) q += `%20since:${sinceMatch[1]}`;
-        else if (startDate) q += `%20since:${startDate}`;
-        if (untilMatch) q += `%20until:${untilMatch[1]}`;
-        else if (endDate) q += `%20until:${endDate}`;
-        if (minLikes > 0) q += `%20min_faves:${minLikes}`;
-        if (minRetweets > 0) q += `%20min_retweets:${minRetweets}`;
-        if (minReplies > 0) q += `%20min_replies:${minReplies}`;
-        q += searchOps;
-        url = `https://x.com/search?q=${q}&src=typed_query&f=live`;
-        break;
-      }
-      case 'url': {
-        url = target.startsWith('http') ? target : `https://x.com/${target}`;
-        break;
-      }
-      default:
-        url = `https://x.com/${target.replace('@', '')}`;
     }
-  }
-
-  console.log(`Scraping: ${url}`);
-
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-  // Wait for first article to appear (up to 10s) instead of fixed 4s
-  try {
-    await page.waitForSelector('article', { timeout: 10000 });
-    console.log('Articles loaded');
-  } catch (e) {
-    console.log('No articles found after 10s, checking page state...');
-    const loginWall = await page.locator('[data-testid="loginButton"], [data-testid="signupButton"]').count();
-    if (loginWall > 0) {
-      console.log('ERROR: Login wall detected. X_STATE cookies expired.');
-    }
+    return url;
   }
 
   const collectedIds = new Set();
   let posts = [];
-  let scrollAttempts = 0;
   const collectTarget = maxResults;
   const maxScrollAttempts = Math.max(collectTarget * 4, 80);
-  let consecutiveEmptyScrolls = 0;
   const username = target.replace('@', '').trim();
-
-  // Initial wait for page to fully render
-  await page.waitForTimeout(2000);
-  const initialArticles = await page.evaluate(() => document.querySelectorAll('article').length);
-  console.log(`Initial page load: ${initialArticles} articles in DOM`);
 
   // ─── BATCH EXTRACTION: runs entirely in browser, ONE round-trip ───
   async function extractPostsFromDOM() {
@@ -200,7 +183,8 @@ function parseEngagementNum(str) {
         try {
           // Text
           const text = (article.innerText || '').trim();
-          if (!text || text.length < 10) continue;
+          const hasMediaInArticle = !!(article.querySelector('[data-testid="tweetPhoto"]') || article.querySelector('[data-testid="videoPlayer"]') || article.querySelector('video'));
+          if (!text || (text.length < 10 && !hasMediaInArticle)) continue;
 
           // Link + tweet ID
           let href = '';
@@ -474,40 +458,64 @@ function parseEngagementNum(str) {
       // Media filter
       if (mediaOnly && !raw.has_media) continue;
 
-      // Pre-filter by sort_by thresholds
-      if (sortBy === 'likes' && likeCount < 3) { console.log(`Pre-filter: likes ${likeCount} < 3, skipping`); continue; }
-      if (sortBy === 'retweets' && retweetCount < 2) { console.log(`Pre-filter: retweets ${retweetCount} < 2, skipping`); continue; }
-      if (sortBy === 'views' && viewCount < 200) { console.log(`Pre-filter: views ${viewCount} < 200, skipping`); continue; }
-      if (sortBy === 'engagement') {
-        const weightedEng = (likeCount + retweetCount + replyCount) + (viewCount > 0 ? viewCount / 25 : 0);
-        if (weightedEng < 3) { console.log(`Pre-filter: engagement ${weightedEng.toFixed(1)} < 3, skipping`); continue; }
-      }
-
       posts.push({ ...raw, like_count: likeCount, retweet_count: retweetCount, reply_count: replyCount, quote_count: quoteCount, view_count: viewCount, bookmark_count: bookmarkCount });
       added++;
     }
     return added;
   }
 
-  while (scrollAttempts < maxScrollAttempts && posts.length < collectTarget) {
-    const prevCount = posts.length;
-    const newPosts = await extractPostsFromDOM();
-    const articlesInDOM = await page.evaluate(() => document.querySelectorAll('article').length);
-    console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM articles: ${articlesInDOM}`);
-    if (newPosts === 0) {
-      consecutiveEmptyScrolls++;
-      if (consecutiveEmptyScrolls >= 8) {
-        console.log('8 consecutive empty scrolls — no more posts');
+  // ─── MULTI-PASS SEARCH: run each sort order, merge + deduplicate ───
+  for (let passIdx = 0; passIdx < searchPasses.length; passIdx++) {
+    const sortOrder = searchPasses[passIdx];
+    const url = buildSearchUrl(sortOrder);
+    console.log(`\n=== PASS ${passIdx + 1}/${searchPasses.length} (${sortOrder}) ===`);
+    console.log(`URL: ${url}`);
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    try {
+      await page.waitForSelector('article', { timeout: 10000 });
+      console.log('Articles loaded');
+    } catch (e) {
+      console.log('No articles found after 10s, checking page state...');
+      const loginWall = await page.locator('[data-testid="loginButton"], [data-testid="signupButton"]').count();
+      if (loginWall > 0) {
+        console.log('ERROR: Login wall detected. X_STATE cookies expired.');
         break;
       }
-    } else {
-      consecutiveEmptyScrolls = 0;
     }
+
+    await page.waitForTimeout(2000);
+    const initialArticles = await page.evaluate(() => document.querySelectorAll('article').length);
+    console.log(`Initial page load: ${initialArticles} articles in DOM`);
+
+    let scrollAttempts = 0;
+    let consecutiveEmptyScrolls = 0;
+    const passMaxScrolls = Math.max(Math.ceil(collectTarget / searchPasses.length) * 4, 40);
+
+    while (scrollAttempts < passMaxScrolls && posts.length < collectTarget) {
+      const newPosts = await extractPostsFromDOM();
+      const articlesInDOM = await page.evaluate(() => document.querySelectorAll('article').length);
+      console.log(`Pass ${passIdx + 1} scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM: ${articlesInDOM}`);
+      if (newPosts === 0) {
+        consecutiveEmptyScrolls++;
+        if (consecutiveEmptyScrolls >= 6) {
+          console.log(`Pass ${passIdx + 1}: 6 consecutive empty scrolls — moving to next pass`);
+          break;
+        }
+      } else {
+        consecutiveEmptyScrolls = 0;
+      }
+      if (posts.length >= collectTarget) break;
+      await page.evaluate(() => window.scrollBy(0, 3500));
+      await page.waitForTimeout(1500);
+      scrollAttempts++;
+    }
+
+    console.log(`Pass ${passIdx + 1} done: ${posts.length} total posts so far`);
     if (posts.length >= collectTarget) break;
-    await page.evaluate(() => window.scrollBy(0, 3500));
-    await page.waitForTimeout(1500);
-    scrollAttempts++;
   }
+
   console.log(`Final collection: ${posts.length} posts (before post-filters)`);
 
   // Post-collection filters

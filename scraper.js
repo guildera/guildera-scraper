@@ -92,7 +92,7 @@ function parseEngagementNum(str) {
   const page = await context.newPage();
 
   const searchPasses = (process.env.SEARCH_PASSES || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (searchPasses.length === 0) searchPasses.push('live'); // default: live (chronological)
+  if (searchPasses.length === 0) searchPasses.push(''); // default: no sort (X relevance = most complete results)
 
   function buildSearchUrl(sortOrder) {
     let url = '';

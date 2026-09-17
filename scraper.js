@@ -81,13 +81,30 @@ function parseEngagementNum(str) {
     fs.writeFileSync(storageStatePath, Buffer.from(process.env.X_STATE, 'base64').toString());
   }
 
-  const contextOptions = { viewport: { width: 1280, height: 900 } };
+  const viewports = [
+    { width: 1366, height: 768 }, { width: 1920, height: 1080 }, { width: 1536, height: 864 },
+    { width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1600, height: 900 }
+  ];
+  const viewport = viewports[Math.floor(Math.random() * viewports.length)];
+  const contextOptions = { viewport };
   if (fs.existsSync(storageStatePath)) contextOptions.storageState = storageStatePath;
 
   const context = await browser.newContext(contextOptions);
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    window.chrome = { runtime: {} };
+    const origQuery = window.navigator.permissions.query;
+    window.navigator.permissions.query = (params) =>
+      params.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission })
+        : origQuery(params);
   });
+
+  function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+  function randDelay(min, max) { return page.waitForTimeout(randInt(min, max)); }
 
   const page = await context.newPage();
 
@@ -490,6 +507,7 @@ function parseEngagementNum(str) {
     console.log(`URL: ${url}`);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await randDelay(3000, 6000);
 
     try {
       await page.waitForSelector('article', { timeout: 15000 });
@@ -503,7 +521,7 @@ function parseEngagementNum(str) {
       }
     }
 
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(randInt(2000, 4000));
     const initialArticles = await page.evaluate(() => document.querySelectorAll('article').length);
     console.log(`Initial page load: ${initialArticles} articles in DOM`);
 
@@ -519,7 +537,7 @@ function parseEngagementNum(str) {
       console.log(`Scroll ${scrollAttempts + 1}: +${newPosts} new (total: ${posts.length}/${collectTarget}) | DOM: ${articlesInDOM}`);
       if (newPosts === 0) {
         consecutiveEmptyScrolls++;
-        if (consecutiveEmptyScrolls >= (isProfileMode ? 8 : 6)) {
+        if (consecutiveEmptyScrolls >= (isProfileMode ? 10 : 8)) {
           console.log(`${consecutiveEmptyScrolls} consecutive empty scrolls — ${isProfileMode ? 'end of profile' : 'moving to next pass'}`);
           break;
         }
@@ -527,8 +545,11 @@ function parseEngagementNum(str) {
         consecutiveEmptyScrolls = 0;
       }
       if (posts.length >= collectTarget) break;
-      await page.evaluate(() => window.scrollBy(0, 3500));
-      await page.waitForTimeout(1500);
+      const scrollAmount = randInt(800, 2500);
+      await page.mouse.move(randInt(100, 500), randInt(200, 600));
+      await page.waitForTimeout(randInt(200, 500));
+      await page.evaluate((amt) => window.scrollBy(0, amt), scrollAmount);
+      await randDelay(1200, 3000);
       scrollAttempts++;
     }
 
